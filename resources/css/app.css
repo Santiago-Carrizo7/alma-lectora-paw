@@ -58,14 +58,14 @@
     --color-sidebar-ring: var(--sidebar-ring);
 
     /* Paleta "Editorial Moderno" de Alma Lectora */
-    --color-paper: #F5F0E8;
-    --color-paper-dark: #EDE7D9;
-    --color-ink: #1C1917;
-    --color-ink-muted: #57534E;
-    --color-forest: #2D5016;
-    --color-forest-light: #3D6B21;
-    --color-amber: #B45309;
-    --color-surface: #FFFFFF;
+    --color-paper: #f5f0e8;
+    --color-paper-dark: #ede7d9;
+    --color-ink: #1c1917;
+    --color-ink-muted: #57534e;
+    --color-forest: #2d5016;
+    --color-forest-light: #3d6b21;
+    --color-amber: #b45309;
+    --color-surface: #ffffff;
 
     --font-serif: 'Playfair Display', Georgia, serif;
     --radius-card: 0.75rem;

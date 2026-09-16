@@ -1,15 +1,20 @@
 <?php
 
+use App\Http\Controllers\AccessoryController;
 use App\Http\Controllers\BookController;
+use App\Http\Controllers\HomeController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
 use App\Http\Controllers\Admin\AdminBookController;
 use App\Http\Controllers\Admin\AdminDashboardController;
 
-Route::get('/', [BookController::class, 'index'])->name('home');
+Route::get('/', [HomeController::class, 'index'])->name('home');
 Route::get('/libros', [BookController::class, 'index'])->name('books.index');
 Route::get('/libros/{book}', [BookController::class, 'show'])->name('books.show');
+
+Route::get('/accesorios', [AccessoryController::class, 'index'])->name('accessories.index');
+Route::get('/accesorios/{accessory}', [AccessoryController::class, 'show'])->name('accessories.show');
 
 Route::middleware(['auth'])->group(function () {
     Route::get('dashboard', function () {

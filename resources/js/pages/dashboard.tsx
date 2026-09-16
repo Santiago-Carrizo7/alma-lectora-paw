@@ -1,63 +1,49 @@
-import React from 'react';
-import { Head, Link, usePage } from '@inertiajs/react';
 import { PageShell } from '@/layouts/page-shell';
+import type { SharedData } from '@/types';
+import { Head, Link, usePage } from '@inertiajs/react';
 
 export default function Dashboard() {
-    const page = usePage();
-    const user = (page.props as any)?.auth?.user;
+    const { props } = usePage<SharedData>();
+    const user = props.auth?.user;
 
     return (
         <PageShell>
             <Head title="Mi Cuenta - Alma Lectora" />
-            <div className="space-y-6 max-w-4xl mx-auto animate-fade-in py-4">
-                <div className="bg-paper-dark/40 rounded-2xl p-6 sm:p-8 border border-paper-dark/80">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-forest bg-forest/10 px-2.5 py-1 rounded-full">
+            <div className="animate-fade-in mx-auto max-w-4xl space-y-6 py-4">
+                <div className="bg-paper-dark/40 border-paper-dark/80 rounded-2xl border p-6 sm:p-8">
+                    <span className="text-forest bg-forest/10 rounded-full px-2.5 py-1 text-[10px] font-bold tracking-wider uppercase">
                         {user?.role === 'admin' ? 'Administrador' : 'Lector'}
                     </span>
-                    <h1 className="text-2xl sm:text-3xl font-bold font-serif text-ink mt-2">
-                        ¡Hola, {user?.name || 'Lector'}!
-                    </h1>
-                    <p className="text-xs sm:text-sm text-ink-muted mt-1 leading-relaxed">
-                        Bienvenido a tu espacio personal en Alma Lectora.
-                    </p>
+                    <h1 className="text-ink mt-2 font-serif text-2xl font-bold sm:text-3xl">¡Hola, {user?.name || 'Lector'}!</h1>
+                    <p className="text-ink-muted mt-1 text-xs leading-relaxed sm:text-sm">Bienvenido a tu espacio personal en Alma Lectora.</p>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <Link
                         href="/libros"
-                        className="p-6 rounded-2xl border border-paper-dark bg-paper hover:border-forest/40 hover:shadow-xs transition-all group"
+                        className="border-paper-dark bg-paper hover:border-forest/40 group rounded-2xl border p-6 transition-all hover:shadow-xs"
                     >
-                        <h3 className="font-bold font-serif text-ink text-base group-hover:text-forest transition-colors">
+                        <h3 className="text-ink group-hover:text-forest font-serif text-base font-bold transition-colors">
                             Explorar Catálogo &rarr;
                         </h3>
-                        <p className="text-xs text-ink-muted mt-1">
-                            Descubre novedades, clásicos y títulos recomendados.
-                        </p>
+                        <p className="text-ink-muted mt-1 text-xs">Descubre novedades, clásicos y títulos recomendados.</p>
                     </Link>
 
                     {user?.role === 'admin' ? (
                         <Link
                             href="/admin"
-                            className="p-6 rounded-2xl border border-forest/30 bg-forest/5 hover:bg-forest/10 hover:shadow-xs transition-all group"
+                            className="border-forest/30 bg-forest/5 hover:bg-forest/10 group rounded-2xl border p-6 transition-all hover:shadow-xs"
                         >
-                            <h3 className="font-bold font-serif text-forest text-base">
-                                Panel de Administración &rarr;
-                            </h3>
-                            <p className="text-xs text-ink-muted mt-1">
-                                Gestionar inventario, catálogo de libros y pedidos.
-                            </p>
+                            <h3 className="text-forest font-serif text-base font-bold">Panel de Administración &rarr;</h3>
+                            <p className="text-ink-muted mt-1 text-xs">Gestionar inventario, catálogo de libros y pedidos.</p>
                         </Link>
                     ) : (
                         <Link
                             href="/settings/profile"
-                            className="p-6 rounded-2xl border border-paper-dark bg-paper hover:border-forest/40 hover:shadow-xs transition-all group"
+                            className="border-paper-dark bg-paper hover:border-forest/40 group rounded-2xl border p-6 transition-all hover:shadow-xs"
                         >
-                            <h3 className="font-bold font-serif text-ink text-base group-hover:text-forest transition-colors">
-                                Mi Perfil &rarr;
-                            </h3>
-                            <p className="text-xs text-ink-muted mt-1">
-                                Actualizar datos personales y contraseña.
-                            </p>
+                            <h3 className="text-ink group-hover:text-forest font-serif text-base font-bold transition-colors">Mi Perfil &rarr;</h3>
+                            <p className="text-ink-muted mt-1 text-xs">Actualizar datos personales y contraseña.</p>
                         </Link>
                     )}
                 </div>
