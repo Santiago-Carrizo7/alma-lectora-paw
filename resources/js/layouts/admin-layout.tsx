@@ -1,6 +1,7 @@
 import type { SharedData } from '@/types';
-import { Link, router, usePage } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import React from 'react';
+import { PageShell } from './page-shell';
 
 interface AdminSharedData extends SharedData {
     flash?: {
@@ -20,102 +21,117 @@ interface AdminLayoutProps {
 
 export function AdminLayout({
     children,
-    title = 'Panel de Administración',
-    subtitle = 'Módulos de gestión y mantenimiento de inventario',
+    title,
+    subtitle,
     breadcrumbText,
-    breadcrumbHref = '/admin',
+    breadcrumbHref,
     action,
 }: AdminLayoutProps) {
-    const { props } = usePage<AdminSharedData>();
-    const user = props.auth?.user;
+    const { props, url } = usePage<AdminSharedData>();
     const flash = props.flash;
 
-    const handleLogout = (e: React.FormEvent) => {
-        e.preventDefault();
-        router.post('/logout');
-    };
+    const isHubMode = url === '/admin' || url === '/admin/';
+    const isAccessoriesArea = url.includes('/accesorios');
+    const isCombosArea = url.includes('/combos');
+    const isOrdersArea = url.includes('/pedidos');
+    const isConfigArea = url.includes('/configuracion');
+
+    // Default breadcrumb logic matching original client
+    const defaultBreadcrumbText = isHubMode ? 'Volver al Catálogo' : 'Volver al Panel Central';
+    const defaultBreadcrumbHref = isHubMode ? '/libros' : '/admin';
+
+    // Default title / subtitle logic matching original client
+    let defaultTitle = 'Panel de Administración';
+    let defaultSubtitle = 'Módulos de gestión y mantenimiento de Alma Lectora';
+
+    if (isHubMode) {
+        defaultTitle = 'Panel de Control General';
+        defaultSubtitle = 'Módulos de gestión y administración centralizada';
+    } else if (url.includes('/nuevo')) {
+        if (isAccessoriesArea) {
+            defaultTitle = 'Nuevo Accesorio';
+            defaultSubtitle = 'Registrar un nuevo accesorio';
+        } else if (isCombosArea) {
+            defaultTitle = 'Nuevo Combo';
+            defaultSubtitle = 'Crear un nuevo combo promocional';
+        } else {
+            defaultTitle = 'Nuevo Libro';
+            defaultSubtitle = 'Registrar un nuevo libro en el catálogo';
+        }
+    } else if (url.includes('/editar')) {
+        if (isAccessoriesArea) {
+            defaultTitle = 'Editar Accesorio';
+            defaultSubtitle = 'Modificar información y stock del accesorio';
+        } else if (isCombosArea) {
+            defaultTitle = 'Editar Combo';
+            defaultSubtitle = 'Modificar información y productos del combo';
+        } else {
+            defaultTitle = 'Editar Libro';
+            defaultSubtitle = 'Modificar información y stock del libro';
+        }
+    } else {
+        if (isAccessoriesArea) {
+            defaultTitle = 'Panel de Accesorios';
+            defaultSubtitle = 'Gestión de Velas, Separadores y Modelos 3D';
+        } else if (isCombosArea) {
+            defaultTitle = 'Panel de Combos';
+            defaultSubtitle = 'Gestión de Combos Promocionales y Paquetes de Regalo';
+        } else if (isOrdersArea) {
+            defaultTitle = 'Gestión de Pedidos';
+            defaultSubtitle = 'Control de confirmaciones de compras, envíos y stock';
+        } else if (isConfigArea) {
+            defaultTitle = 'Configuración de Tienda';
+            defaultSubtitle = 'Ajustes de contacto, costos de logística y catálogo dinámico';
+        } else {
+            defaultTitle = 'Panel de Libros';
+            defaultSubtitle = 'Mantenimiento de inventario, ABM y carga rápida con escáner';
+        }
+    }
+
+    const resolvedTitle = title ?? defaultTitle;
+    const resolvedSubtitle = subtitle ?? defaultSubtitle;
+    const resolvedBreadcrumbText = breadcrumbText ?? defaultBreadcrumbText;
+    const resolvedBreadcrumbHref = breadcrumbHref ?? defaultBreadcrumbHref;
+
+    // Action button defaults matching original client if none provided
+    let resolvedAction = action;
+    if (!resolvedAction) {
+        if (url === '/admin/libros' || url === '/admin/libros/') {
+            resolvedAction = (
+                <Link
+                    href="/admin/libros/nuevo"
+                    className="bg-forest text-stone-100 hover:bg-forest-dark flex items-center justify-center rounded-xl px-4 py-2 text-xs font-serif font-bold shadow-xs transition-colors"
+                >
+                    + Nuevo Libro
+                </Link>
+            );
+        } else if (url === '/admin/accesorios' || url === '/admin/accesorios/') {
+            resolvedAction = (
+                <Link
+                    href="/admin/accesorios/nuevo"
+                    className="bg-forest text-stone-100 hover:bg-forest-dark flex items-center justify-center rounded-xl px-4 py-2 text-xs font-serif font-bold shadow-xs transition-colors"
+                >
+                    + Nuevo Accesorio
+                </Link>
+            );
+        } else if (url === '/admin/combos' || url === '/admin/combos/') {
+            resolvedAction = (
+                <Link
+                    href="/admin/combos/nuevo"
+                    className="bg-forest text-stone-100 hover:bg-forest-dark flex items-center justify-center rounded-xl px-4 py-2 text-xs font-serif font-bold shadow-xs transition-colors"
+                >
+                    + Nuevo Combo
+                </Link>
+            );
+        }
+    }
 
     return (
-        <div className="bg-paper text-ink selection:bg-forest/20 selection:text-forest flex min-h-screen flex-col font-sans">
-            {/* Top Admin Navigation */}
-            <header className="bg-paper/95 border-paper-dark/80 sticky top-0 z-40 border-b px-4 py-3 shadow-xs backdrop-blur-md sm:px-6">
-                <div className="mx-auto flex max-w-6xl items-center justify-between">
-                    <div className="flex items-center gap-6">
-                        <Link href="/admin" className="group flex items-center gap-2">
-                            <svg
-                                className="text-forest h-6 w-6 transition-transform duration-300 group-hover:scale-105"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2.5"
-                                viewBox="0 0 24 24"
-                            >
-                                <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-                                />
-                            </svg>
-                            <div className="flex flex-col">
-                                <span className="text-ink font-serif text-lg leading-none font-bold tracking-tight">Alma Lectora</span>
-                                <span className="text-forest text-[10px] font-semibold tracking-wider uppercase">Panel Admin</span>
-                            </div>
-                        </Link>
-
-                        <nav className="text-ink-muted hidden items-center gap-4 text-xs font-semibold tracking-wider uppercase md:flex">
-                            <Link
-                                href="/admin"
-                                className={`rounded-lg px-3 py-1.5 transition-colors ${
-                                    page.url === '/admin' ? 'bg-forest/10 text-forest font-bold' : 'hover:text-forest'
-                                }`}
-                            >
-                                Hub
-                            </Link>
-                            <Link
-                                href="/admin/libros"
-                                className={`rounded-lg px-3 py-1.5 transition-colors ${
-                                    page.url.startsWith('/admin/libros') ? 'bg-forest/10 text-forest font-bold' : 'hover:text-forest'
-                                }`}
-                            >
-                                Libros
-                            </Link>
-                            <Link
-                                href="/libros"
-                                className="hover:text-forest rounded-lg px-3 py-1.5 text-stone-400 transition-colors"
-                                target="_blank"
-                                title="Abrir tienda en nueva pestaña"
-                            >
-                                Ver Tienda ↗
-                            </Link>
-                        </nav>
-                    </div>
-
-                    {/* User profile & actions */}
-                    <div className="flex items-center gap-3">
-                        {user && (
-                            <div className="hidden text-right sm:block">
-                                <div className="text-ink text-xs font-semibold">{user.name}</div>
-                                <div className="text-forest text-[10px] font-bold tracking-wider uppercase">
-                                    {user.role === 'admin' ? 'Administrador' : user.role}
-                                </div>
-                            </div>
-                        )}
-                        <form onSubmit={handleLogout}>
-                            <button
-                                type="submit"
-                                className="hover:text-ink cursor-pointer rounded-lg border border-stone-300 px-3 py-1.5 text-xs font-semibold text-stone-600 transition-colors hover:bg-stone-200/60"
-                            >
-                                Cerrar Sesión
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            </header>
-
-            {/* Main Layout Container */}
-            <main className="mx-auto w-full max-w-6xl flex-1 space-y-6 px-4 py-6 sm:px-6 sm:py-8">
+        <PageShell>
+            <div className="mx-auto max-w-5xl space-y-6 sm:space-y-8 animate-fade-in py-2 sm:py-6">
                 {/* Flash Notifications */}
                 {flash?.success && (
-                    <div className="bg-forest/10 border-forest/30 text-forest animate-fade-in flex items-center gap-3 rounded-xl border p-4 text-sm font-medium">
+                    <div className="bg-forest/10 border-forest/30 text-forest flex items-center gap-3 rounded-xl border p-4 text-sm font-medium animate-fade-in">
                         <svg className="h-5 w-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
                         </svg>
@@ -123,7 +139,7 @@ export function AdminLayout({
                     </div>
                 )}
                 {flash?.error && (
-                    <div className="animate-fade-in flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">
+                    <div className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700 animate-fade-in">
                         <svg className="h-5 w-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                             <path
                                 strokeLinecap="round"
@@ -135,38 +151,35 @@ export function AdminLayout({
                     </div>
                 )}
 
-                {/* Section Header */}
-                <div className="border-paper-dark/70 flex flex-col gap-4 border-b pb-5 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="space-y-1">
-                        {breadcrumbText && (
-                            <div className="mb-1 flex items-center gap-1.5">
-                                <Link href={breadcrumbHref} className="text-forest flex items-center gap-1 text-xs font-semibold hover:underline">
-                                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
-                                    </svg>
-                                    {breadcrumbText}
-                                </Link>
-                            </div>
-                        )}
-                        <h1 className="text-ink font-serif text-2xl font-bold tracking-tight sm:text-3xl">{title}</h1>
-                        <p className="text-ink-muted text-xs sm:text-sm">{subtitle}</p>
+                {/* Header bar matching original AdminLayout */}
+                <div className="border-paper-dark/60 flex flex-col gap-4 border-b pb-6 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <div className="mb-1 flex items-center gap-2">
+                            <Link
+                                href={resolvedBreadcrumbHref}
+                                className="text-forest hover:underline flex items-center gap-1 text-xs font-semibold"
+                            >
+                                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+                                </svg>
+                                <span>{resolvedBreadcrumbText}</span>
+                            </Link>
+                        </div>
+                        <h1 className="text-ink font-serif text-2xl sm:text-3xl font-bold">{resolvedTitle}</h1>
+                        <p className="text-ink-muted text-xs sm:text-sm">{resolvedSubtitle}</p>
                     </div>
 
-                    {action && <div className="flex shrink-0 items-center gap-3">{action}</div>}
+                    {resolvedAction && (
+                        <div className="flex shrink-0 items-center gap-2">
+                            {resolvedAction}
+                        </div>
+                    )}
                 </div>
 
-                {/* Content */}
-                <div className="animate-fade-in">{children}</div>
-            </main>
-
-            {/* Admin Footer */}
-            <footer className="border-paper-dark/60 bg-paper mt-auto border-t px-4 py-6 text-center">
-                <div className="mx-auto max-w-6xl space-y-1">
-                    <p className="text-ink-muted text-xs">Panel de Gestión Administrativa — &copy; {new Date().getFullYear()} Alma Lectora</p>
-                    <p className="text-[11px] text-stone-400">Arquitectura Monolítica con Laravel 12/13, Inertia.js v2 y React 19</p>
-                </div>
-            </footer>
-        </div>
+                {/* Main Content */}
+                <div>{children}</div>
+            </div>
+        </PageShell>
     );
 }
 

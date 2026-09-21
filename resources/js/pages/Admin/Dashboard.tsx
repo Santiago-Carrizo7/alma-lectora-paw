@@ -5,12 +5,10 @@ export function Dashboard() {
     const modules = [
         {
             title: 'Gestión de Libros',
-            description: 'Control de inventario, catálogo, altas, bajas lógicas, reactivación y ajuste táctil de stock.',
+            description: 'Control de inventario, ABM y alta de libros mediante buscador ISBN o manual.',
             href: '/admin/libros',
-            active: true,
-            badge: 'Fase 2 Activa',
             icon: (
-                <svg className="text-forest h-8 w-8" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                <svg className="text-forest h-10 w-10" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
                     <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -22,11 +20,9 @@ export function Dashboard() {
         {
             title: 'Accesorios',
             description: 'Mantenimiento de catálogo de velas aromáticas, señaladores y complementos.',
-            href: '#',
-            active: false,
-            badge: 'Próximamente',
+            href: '/admin/accesorios',
             icon: (
-                <svg className="h-8 w-8 text-stone-400" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                <svg className="text-forest h-10 w-10" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
                     <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -42,12 +38,10 @@ export function Dashboard() {
         },
         {
             title: 'Combos Promocionales',
-            description: 'Creación y edición de paquetes de libros con accesorios y promociones por volumen.',
-            href: '#',
-            active: false,
-            badge: 'Próximamente',
+            description: 'Creación y edición de paquetes de libros con accesorios y descuentos.',
+            href: '/admin/combos',
             icon: (
-                <svg className="h-8 w-8 text-stone-400" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                <svg className="text-forest h-10 w-10" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
                     <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -58,12 +52,10 @@ export function Dashboard() {
         },
         {
             title: 'Gestión de Pedidos',
-            description: 'Control de órdenes, confirmación de compras de clientes y deducción de inventario.',
-            href: '#',
-            active: false,
-            badge: 'Próximamente',
+            description: 'Control de confirmaciones de compras, chat directo con clientes y descuento de stock.',
+            href: '/admin/pedidos',
             icon: (
-                <svg className="h-8 w-8 text-stone-400" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                <svg className="text-forest h-10 w-10" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
                     <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -74,12 +66,10 @@ export function Dashboard() {
         },
         {
             title: 'Configuración',
-            description: 'Ajustes generales del negocio, costos de envío y parámetros de contacto.',
-            href: '#',
-            active: false,
-            badge: 'Próximamente',
+            description: 'Ajustes generales de la tienda, costos de envío y variables del sistema.',
+            href: '/admin/configuracion',
             icon: (
-                <svg className="h-8 w-8 text-stone-400" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                <svg className="text-forest h-10 w-10" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
                     <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -92,77 +82,45 @@ export function Dashboard() {
     ];
 
     return (
-        <AdminLayout title="Centro de Control General" subtitle="Bienvenido al panel de gestión de Alma Lectora 2">
+        <AdminLayout
+            title="Panel de Control General"
+            subtitle="Módulos de gestión y administración centralizada"
+            breadcrumbText="Volver al Catálogo"
+            breadcrumbHref="/libros"
+        >
             <Head title="Panel de Administración" />
 
-            {/* Welcome Banner */}
-            <div className="bg-paper-dark/40 border-paper-dark/80 text-ink space-y-2 rounded-2xl border p-6">
-                <h2 className="text-ink font-serif text-xl font-bold">Arquitectura Monolítica Integral</h2>
-                <p className="text-ink-muted max-w-3xl text-sm leading-relaxed">
-                    Este panel opera con el stack moderno de Laravel 12/13 e Inertia.js v2 sobre React 19. Las operaciones de inventario, bajas
-                    lógicas y validación se ejecutan de manera atómica en la base de datos PostgreSQL mediante Eloquent ORM.
-                </p>
-            </div>
+            <div className="space-y-6 animate-fade-in">
+                {/* Welcome Banner matching original AdminHub */}
+                <div className="bg-paper-dark/30 border-paper-dark/60 text-ink rounded-2xl border p-6">
+                    <h2 className="text-ink font-serif text-xl font-bold mb-2">Panel de Control General</h2>
+                    <p className="text-ink-muted text-sm leading-relaxed">
+                        Bienvenido al centro de administración de Alma Lectora. Desde aquí puedes gestionar los diferentes módulos de la tienda. Selecciona una opción para comenzar.
+                    </p>
+                </div>
 
-            {/* Modules Grid */}
-            <div className="grid grid-cols-1 gap-5 pt-2 md:grid-cols-2">
-                {modules.map((mod) => {
-                    const CardContent = (
-                        <div
-                            className={`flex h-full flex-col justify-between rounded-2xl border p-6 transition-all duration-200 ${
-                                mod.active
-                                    ? 'bg-paper border-paper-dark/90 hover:border-forest/40 group cursor-pointer hover:shadow-md'
-                                    : 'bg-paper-dark/20 border-paper-dark/40 cursor-not-allowed opacity-70'
-                            }`}
+                {/* Modules Grid */}
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                    {modules.map((mod) => (
+                        <Link
+                            key={mod.title}
+                            href={mod.href}
+                            className="bg-paper-dark/40 border-paper-dark/60 hover:border-forest/30 group flex cursor-pointer items-start gap-4 rounded-xl border p-6 shadow-xs transition-all duration-200 hover:scale-[1.01] hover:shadow-md"
                         >
-                            <div className="space-y-4">
-                                <div className="flex items-center justify-between">
-                                    <div
-                                        className={`rounded-xl border p-3 ${
-                                            mod.active
-                                                ? 'bg-paper-dark/60 border-paper-dark group-hover:bg-forest/10'
-                                                : 'border-stone-200 bg-stone-100'
-                                        }`}
-                                    >
-                                        {mod.icon}
-                                    </div>
-                                    <span
-                                        className={`rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wider uppercase ${
-                                            mod.active ? 'bg-forest/15 text-forest border-forest/30 border' : 'bg-stone-200 text-stone-600'
-                                        }`}
-                                    >
-                                        {mod.badge}
-                                    </span>
-                                </div>
-
-                                <div className="space-y-1">
-                                    <h3
-                                        className={`font-serif text-lg font-bold ${
-                                            mod.active ? 'text-ink group-hover:text-forest transition-colors' : 'text-stone-600'
-                                        }`}
-                                    >
-                                        {mod.title}
-                                    </h3>
-                                    <p className="text-ink-muted text-xs leading-relaxed">{mod.description}</p>
-                                </div>
+                            <div className="bg-paper border-paper-dark group-hover:bg-forest/5 shrink-0 rounded-lg border p-3 transition-colors">
+                                {mod.icon}
                             </div>
-
-                            {mod.active && (
-                                <div className="border-paper-dark/60 text-forest mt-2 flex items-center border-t pt-4 text-xs font-bold group-hover:underline">
-                                    Acceder al módulo &rarr;
-                                </div>
-                            )}
-                        </div>
-                    );
-
-                    return mod.active ? (
-                        <Link key={mod.title} href={mod.href}>
-                            {CardContent}
+                            <div className="space-y-1">
+                                <h3 className="text-ink group-hover:text-forest font-serif text-lg font-bold transition-colors">
+                                    {mod.title}
+                                </h3>
+                                <p className="text-ink-muted text-xs leading-relaxed">
+                                    {mod.description}
+                                </p>
+                            </div>
                         </Link>
-                    ) : (
-                        <div key={mod.title}>{CardContent}</div>
-                    );
-                })}
+                    ))}
+                </div>
             </div>
         </AdminLayout>
     );

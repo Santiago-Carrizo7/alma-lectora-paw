@@ -95,7 +95,7 @@ export function Index({ books, filters, counts }: IndexProps) {
         <AdminLayout
             title="Gestión de Libros"
             subtitle="Control de inventario, catálogo, bajas y ajuste de stock"
-            breadcrumbText="Volver al Hub"
+            breadcrumbText="Volver al Panel Central"
             breadcrumbHref="/admin"
             action={
                 <Link
