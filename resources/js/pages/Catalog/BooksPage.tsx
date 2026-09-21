@@ -1,9 +1,9 @@
 import { Head, router } from '@inertiajs/react';
-import { useState } from 'react';
 import { BookCard } from '../../components/catalog/book-card';
 import { FilterChips } from '../../components/catalog/filter-chips';
 import { SearchBar } from '../../components/catalog/search-bar';
 import { PageShell } from '../../layouts/page-shell';
+import { getSectionSlice } from '../../lib/catalog-utils';
 import { toTitleCase } from '../../lib/string-utils';
 import type { Book, CatalogFilters } from '../../types/alma';
 
@@ -14,15 +14,12 @@ interface BooksPageProps {
 }
 
 export default function BooksPage({ books = [], filters = {}, genres = [] }: BooksPageProps) {
-    const [searchVal, setSearchVal] = useState(filters.search || '');
-
     const applyFilters = (newFilters: Partial<CatalogFilters>) => {
         const merged = {
             ...filters,
             ...newFilters,
         };
 
-        // Remove empty parameters
         const cleanParams: Record<string, string> = {};
         if (merged.search && merged.search.trim()) cleanParams.search = merged.search.trim();
         if (merged.genre && merged.genre.trim()) cleanParams.genre = merged.genre.trim();
@@ -30,12 +27,12 @@ export default function BooksPage({ books = [], filters = {}, genres = [] }: Boo
 
         router.get('/libros', cleanParams, {
             preserveState: true,
+            preserveScroll: true,
             replace: true,
         });
     };
 
     const handleSearchChange = (term: string) => {
-        setSearchVal(term);
         applyFilters({ search: term });
     };
 
@@ -47,14 +44,22 @@ export default function BooksPage({ books = [], filters = {}, genres = [] }: Boo
         applyFilters({ badge: badge || undefined });
     };
 
+    const handleViewMoreBadge = (badge: string) => {
+        applyFilters({ badge, genre: undefined });
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    const handleViewMoreGenre = (genre: string) => {
+        applyFilters({ genre, badge: undefined });
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
     const handleClearAll = () => {
-        setSearchVal('');
-        router.get('/libros', {}, { preserveState: true, replace: true });
+        router.get('/libros', {}, { preserveState: true, preserveScroll: true, replace: true });
     };
 
     const isFiltered = Boolean(filters.search || filters.genre || filters.badge);
 
-    // Groupings for default view (when not filtered)
     const bestSellers = books.filter((b) => b.badge === 'Más vendido');
     const novelties = books.filter((b) => b.badge === 'Novedad' || b.badge === 'Destacado');
     const otherBooks = books.filter((b) => b.badge !== 'Más vendido' && b.badge !== 'Novedad' && b.badge !== 'Destacado');
@@ -87,9 +92,8 @@ export default function BooksPage({ books = [], filters = {}, genres = [] }: Boo
                     </p>
                 </div>
 
-                {/* Controls: Search and Filter Chips */}
                 <div className="flex flex-col items-center gap-2">
-                    <SearchBar value={searchVal} onChange={handleSearchChange} />
+                    <SearchBar value={filters.search || ''} onChange={handleSearchChange} />
                     <FilterChips
                         genres={genres}
                         selectedGenre={filters.genre}
@@ -100,7 +104,6 @@ export default function BooksPage({ books = [], filters = {}, genres = [] }: Boo
                     />
                 </div>
 
-                {/* Catalog Body */}
                 {books.length === 0 ? (
                     <div className="mx-auto max-w-md py-20 text-center">
                         <svg className="mx-auto h-16 w-16 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -122,7 +125,6 @@ export default function BooksPage({ books = [], filters = {}, genres = [] }: Boo
                         </button>
                     </div>
                 ) : isFiltered ? (
-                    /* Grilla unificada cuando hay filtros aplicados */
                     <div className="space-y-4">
                         <div className="border-paper-dark/80 flex items-center justify-between border-b pb-2">
                             <span className="text-ink-muted text-xs font-bold tracking-wider uppercase">
@@ -143,46 +145,120 @@ export default function BooksPage({ books = [], filters = {}, genres = [] }: Boo
                         </div>
                     </div>
                 ) : (
-                    /* Vista por secciones destacadas y géneros cuando no hay filtro activo */
                     <div className="space-y-12">
-                        {bestSellers.length > 0 && (
-                            <div className="space-y-4">
-                                <h2 className="text-ink border-paper-dark/80 flex items-center gap-2 border-b pb-2 font-serif text-xl font-bold tracking-tight">
-                                    <span>🔥</span> Los más vendidos
-                                </h2>
-                                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-6 lg:grid-cols-4">
-                                    {bestSellers.map((book) => (
-                                        <BookCard key={book.id} book={book} />
-                                    ))}
+                        {bestSellers.length > 0 && (() => {
+                            const { visible, showMore } = getSectionSlice(bestSellers, 4, 2);
+                            return (
+                                <div className="space-y-4">
+                                    <div className="border-paper-dark/80 flex items-center justify-between border-b pb-2">
+                                        <h2 className="text-ink flex items-center gap-2 font-serif text-xl font-bold tracking-tight">
+                                            <span>🔥</span> Los más vendidos
+                                        </h2>
+                                        {showMore && (
+                                            <button
+                                                type="button"
+                                                onClick={() => handleViewMoreBadge('Más vendido')}
+                                                className="text-forest hover:text-forest-light cursor-pointer text-xs font-semibold tracking-wide transition-colors hover:underline"
+                                            >
+                                                Ver más ({bestSellers.length}) &rarr;
+                                            </button>
+                                        )}
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-6 lg:grid-cols-4">
+                                        {visible.map((book) => (
+                                            <BookCard key={book.id} book={book} />
+                                        ))}
+                                    </div>
+                                    {showMore && (
+                                        <div className="flex justify-end pt-1">
+                                            <button
+                                                type="button"
+                                                onClick={() => handleViewMoreBadge('Más vendido')}
+                                                className="text-forest hover:text-forest-light flex cursor-pointer items-center gap-1 text-xs font-semibold transition-colors hover:underline"
+                                            >
+                                                Ver todos los más vendidos ({bestSellers.length}) &rarr;
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
-                            </div>
-                        )}
+                            );
+                        })()}
 
-                        {novelties.length > 0 && (
-                            <div className="space-y-4">
-                                <h2 className="text-ink border-paper-dark/80 flex items-center gap-2 border-b pb-2 font-serif text-xl font-bold tracking-tight">
-                                    <span>✨</span> Novedades y Recomendados
-                                </h2>
-                                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-6 lg:grid-cols-4">
-                                    {novelties.map((book) => (
-                                        <BookCard key={book.id} book={book} />
-                                    ))}
+                        {novelties.length > 0 && (() => {
+                            const { visible, showMore } = getSectionSlice(novelties, 4, 2);
+                            return (
+                                <div className="space-y-4">
+                                    <div className="border-paper-dark/80 flex items-center justify-between border-b pb-2">
+                                        <h2 className="text-ink flex items-center gap-2 font-serif text-xl font-bold tracking-tight">
+                                            <span>✨</span> Novedades y Recomendados
+                                        </h2>
+                                        {showMore && (
+                                            <button
+                                                type="button"
+                                                onClick={() => handleViewMoreBadge('Novedad')}
+                                                className="text-forest hover:text-forest-light cursor-pointer text-xs font-semibold tracking-wide transition-colors hover:underline"
+                                            >
+                                                Ver más ({novelties.length}) &rarr;
+                                            </button>
+                                        )}
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-6 lg:grid-cols-4">
+                                        {visible.map((book) => (
+                                            <BookCard key={book.id} book={book} />
+                                        ))}
+                                    </div>
+                                    {showMore && (
+                                        <div className="flex justify-end pt-1">
+                                            <button
+                                                type="button"
+                                                onClick={() => handleViewMoreBadge('Novedad')}
+                                                className="text-forest hover:text-forest-light flex cursor-pointer items-center gap-1 text-xs font-semibold transition-colors hover:underline"
+                                            >
+                                                Ver todas las novedades ({novelties.length}) &rarr;
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
-                            </div>
-                        )}
+                            );
+                        })()}
 
-                        {Object.entries(byGenre).map(([genreName, genreBooks]) => (
-                            <div key={genreName} className="space-y-4">
-                                <h2 className="text-ink border-paper-dark/80 flex items-center gap-2 border-b pb-2 font-serif text-xl font-bold tracking-tight">
-                                    <span>📚</span> {genreName}
-                                </h2>
-                                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-6 lg:grid-cols-4">
-                                    {genreBooks.map((book) => (
-                                        <BookCard key={book.id} book={book} />
-                                    ))}
+                        {Object.entries(byGenre).map(([genreName, genreBooks]) => {
+                            const { visible, showMore } = getSectionSlice(genreBooks, 4, 2);
+                            return (
+                                <div key={genreName} className="space-y-4">
+                                    <div className="border-paper-dark/80 flex items-center justify-between border-b pb-2">
+                                        <h2 className="text-ink flex items-center gap-2 font-serif text-xl font-bold tracking-tight">
+                                            <span>📚</span> {genreName}
+                                        </h2>
+                                        {showMore && (
+                                            <button
+                                                type="button"
+                                                onClick={() => handleViewMoreGenre(genreName)}
+                                                className="text-forest hover:text-forest-light cursor-pointer text-xs font-semibold tracking-wide transition-colors hover:underline"
+                                            >
+                                                Ver más ({genreBooks.length}) &rarr;
+                                            </button>
+                                        )}
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-6 lg:grid-cols-4">
+                                        {visible.map((book) => (
+                                            <BookCard key={book.id} book={book} />
+                                        ))}
+                                    </div>
+                                    {showMore && (
+                                        <div className="flex justify-end pt-1">
+                                            <button
+                                                type="button"
+                                                onClick={() => handleViewMoreGenre(genreName)}
+                                                className="text-forest hover:text-forest-light flex cursor-pointer items-center gap-1 text-xs font-semibold transition-colors hover:underline"
+                                            >
+                                                Ver todos en {genreName} ({genreBooks.length}) &rarr;
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
             </div>

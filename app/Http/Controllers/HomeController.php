@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Accessory;
 use App\Models\Book;
+use App\Models\Combo;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -44,6 +45,11 @@ class HomeController extends Controller
                 ->get();
         }
 
+        $combos = Combo::active()
+            ->with(['books.book.authors', 'accessories.accessory'])
+            ->take(8)
+            ->get();
+
         $featuredAccessories = Accessory::active()
             ->where('stock', '>', 0)
             ->take(8)
@@ -52,6 +58,7 @@ class HomeController extends Controller
         return Inertia::render('Catalog/HomePage', [
             'bestSellers' => $bestSellers,
             'novelties' => $novelties,
+            'combos' => $combos,
             'featuredAccessories' => $featuredAccessories,
         ]);
     }

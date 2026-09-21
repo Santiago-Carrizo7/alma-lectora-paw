@@ -8,24 +8,43 @@ interface SearchBarProps {
 
 export function SearchBar({ value = '', onChange, placeholder = 'Buscar por título, autor o palabra clave...' }: SearchBarProps) {
     const [localVal, setLocalVal] = useState(value);
-    const isFirstRender = useRef(true);
+    const onChangeRef = useRef(onChange);
+    onChangeRef.current = onChange;
+
+    const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
         setLocalVal(value);
     }, [value]);
 
     useEffect(() => {
-        if (isFirstRender.current) {
-            isFirstRender.current = false;
-            return;
+        return () => {
+            if (timerRef.current) {
+                clearTimeout(timerRef.current);
+            }
+        };
+    }, []);
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const nextVal = e.target.value;
+        setLocalVal(nextVal);
+
+        if (timerRef.current) {
+            clearTimeout(timerRef.current);
         }
 
-        const handler = setTimeout(() => {
-            onChange(localVal);
+        timerRef.current = setTimeout(() => {
+            onChangeRef.current(nextVal);
         }, 350);
+    };
 
-        return () => clearTimeout(handler);
-    }, [localVal, onChange]);
+    const handleClear = () => {
+        if (timerRef.current) {
+            clearTimeout(timerRef.current);
+        }
+        setLocalVal('');
+        onChangeRef.current('');
+    };
 
     return (
         <div className="relative mx-auto w-full max-w-lg">
@@ -37,7 +56,7 @@ export function SearchBar({ value = '', onChange, placeholder = 'Buscar por tít
             <input
                 type="text"
                 value={localVal}
-                onChange={(e) => setLocalVal(e.target.value)}
+                onChange={handleInputChange}
                 placeholder={placeholder}
                 aria-label="Buscar libros por título o autor"
                 className="bg-surface text-ink focus:ring-forest/40 focus:border-forest block w-full rounded-lg border border-stone-300 py-2.5 pr-10 pl-11 font-sans text-sm placeholder-stone-400 shadow-2xs transition-all duration-200 focus:ring-2 focus:outline-none"
@@ -45,10 +64,7 @@ export function SearchBar({ value = '', onChange, placeholder = 'Buscar por tít
             {localVal && (
                 <button
                     type="button"
-                    onClick={() => {
-                        setLocalVal('');
-                        onChange('');
-                    }}
+                    onClick={handleClear}
                     className="hover:text-ink absolute inset-y-0 right-0 flex cursor-pointer items-center pr-3 text-stone-400 transition-colors"
                     aria-label="Limpiar búsqueda"
                 >

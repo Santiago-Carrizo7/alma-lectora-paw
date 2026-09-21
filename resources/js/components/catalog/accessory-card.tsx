@@ -1,17 +1,42 @@
 import { Link } from '@inertiajs/react';
 import React from 'react';
+import { useCart } from '../../lib/cart-store';
 import { formatPrice } from '../../lib/price';
 import type { Accessory } from '../../types/alma';
+import { ButtonEditorial } from '../ui/button-editorial';
 
 interface AccessoryCardProps {
     accessory: Accessory;
+    onAddToCart?: (accessory: Accessory) => void;
 }
 
-export const AccessoryCard = React.memo(function AccessoryCard({ accessory }: AccessoryCardProps) {
+export const AccessoryCard = React.memo(function AccessoryCard({ accessory, onAddToCart }: AccessoryCardProps) {
+    const { addItem, openCart } = useCart();
     const isOutOfStock = accessory.stock === 0;
     const cover = accessory.coverUrl || accessory.cover_url;
     const promoQty = accessory.promoQuantity || accessory.promo_quantity;
     const promoPrc = accessory.promoPrice || accessory.promo_price;
+
+    const handleAddToCart = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (isOutOfStock) return;
+        if (onAddToCart) {
+            onAddToCart(accessory);
+        } else {
+            addItem({
+                id: accessory.id,
+                type: 'ACCESSORY',
+                title: accessory.title,
+                coverUrl: cover,
+                price: accessory.price,
+                promoQuantity: promoQty,
+                promoPrice: promoPrc,
+                stock: accessory.stock,
+            });
+            openCart();
+        }
+    };
 
     return (
         <div
@@ -71,9 +96,15 @@ export const AccessoryCard = React.memo(function AccessoryCard({ accessory }: Ac
 
                     <div className="mt-3 flex items-center justify-between gap-1">
                         <span className="text-amber font-mono text-sm font-bold">{formatPrice(accessory.price)}</span>
-                        <span className="text-forest text-xs font-semibold group-hover:underline">
-                            {isOutOfStock ? 'Sin Stock' : 'Ver detalle →'}
-                        </span>
+                        <ButtonEditorial
+                            size="sm"
+                            onClick={handleAddToCart}
+                            disabled={isOutOfStock}
+                            aria-label={isOutOfStock ? `${accessory.title} está agotado` : `Agregar ${accessory.title} al carrito`}
+                            className="px-2.5 py-1 text-xs font-semibold"
+                        >
+                            {isOutOfStock ? 'Agotado' : 'Agregar'}
+                        </ButtonEditorial>
                     </div>
                 </div>
             </Link>

@@ -1,5 +1,6 @@
 import { Link } from '@inertiajs/react';
 import React from 'react';
+import { useCart } from '../../lib/cart-store';
 import { formatPrice } from '../../lib/price';
 import type { Book } from '../../types/alma';
 import { BadgeEditorial } from '../ui/badge-editorial';
@@ -12,6 +13,7 @@ interface BookCardProps {
 }
 
 export const BookCard = React.memo(function BookCard({ book, onAddToCart }: BookCardProps) {
+    const { addItem, openCart } = useCart();
     const isOutOfStock = book.stock === 0;
     const cover = book.coverUrl || book.cover_url;
     const promoQty = book.promoQuantity || book.promo_quantity;
@@ -25,6 +27,19 @@ export const BookCard = React.memo(function BookCard({ book, onAddToCart }: Book
         if (isOutOfStock) return;
         if (onAddToCart) {
             onAddToCart(book);
+        } else {
+            addItem({
+                id: book.id,
+                type: 'BOOK',
+                title: book.title,
+                author: authorNames,
+                coverUrl: cover,
+                price: book.price,
+                promoQuantity: promoQty,
+                promoPrice: promoPrc,
+                stock: book.stock,
+            });
+            openCart();
         }
     };
 
@@ -102,7 +117,7 @@ export const BookCard = React.memo(function BookCard({ book, onAddToCart }: Book
                             aria-label={isOutOfStock ? `${book.title} está agotado` : `Ver detalles de ${book.title}`}
                             className="px-3 py-1.5 text-xs font-semibold"
                         >
-                            {isOutOfStock ? 'Agotado' : 'Ver detalle'}
+                            {isOutOfStock ? 'Agotado' : 'Agregar'}
                         </ButtonEditorial>
                     </div>
                 </div>
