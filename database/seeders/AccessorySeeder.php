@@ -5,11 +5,58 @@ namespace Database\Seeders;
 use App\Models\Accessory;
 use App\Models\AccessoryCategory;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\File;
 
 class AccessorySeeder extends Seeder
 {
     public function run(): void
     {
+        $backupFile = database_path('seeders/backup_data.json');
+
+        if (File::exists($backupFile)) {
+            $data = json_decode(File::get($backupFile), true);
+            $tables = $data['tables'] ?? $data;
+            $categories = $tables['accessoryCategories'] ?? [];
+            $accessories = $tables['accessories'] ?? [];
+
+            foreach ($categories as $cat) {
+                AccessoryCategory::updateOrCreate(
+                    ['id' => $cat['id']],
+                    [
+                        'slug' => $cat['slug'],
+                        'label' => $cat['label'],
+                        'emoji' => $cat['emoji'] ?? null,
+                        'order' => $cat['order'] ?? 0,
+                        'is_active' => $cat['isActive'] ?? true,
+                        'created_at' => $cat['createdAt'] ?? now(),
+                        'updated_at' => $cat['updatedAt'] ?? now(),
+                    ]
+                );
+            }
+
+            foreach ($accessories as $acc) {
+                Accessory::updateOrCreate(
+                    ['id' => $acc['id']],
+                    [
+                        'title' => $acc['title'],
+                        'description' => $acc['description'] ?? null,
+                        'price' => $acc['price'] ?? 0,
+                        'promo_quantity' => $acc['promoQuantity'] ?? null,
+                        'promo_price' => $acc['promoPrice'] ?? null,
+                        'stock' => $acc['stock'] ?? 0,
+                        'category' => $acc['category'],
+                        'cover_url' => $acc['coverUrl'] ?? null,
+                        'additional_images' => $acc['additionalImages'] ?? [],
+                        'is_active' => $acc['isActive'] ?? true,
+                        'created_at' => $acc['createdAt'] ?? now(),
+                        'updated_at' => $acc['updatedAt'] ?? now(),
+                    ]
+                );
+            }
+
+            return;
+        }
+
         $categories = [
             [
                 'slug' => 'velas',

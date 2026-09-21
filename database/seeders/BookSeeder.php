@@ -5,6 +5,8 @@ namespace Database\Seeders;
 use App\Models\Author;
 use App\Models\Book;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 
 class BookSeeder extends Seeder
 {
@@ -13,6 +15,65 @@ class BookSeeder extends Seeder
      */
     public function run(): void
     {
+        $backupFile = database_path('seeders/backup_data.json');
+
+        if (File::exists($backupFile)) {
+            $data = json_decode(File::get($backupFile), true);
+            $tables = $data['tables'] ?? $data;
+            $authors = $tables['authors'] ?? [];
+            $books = $tables['books'] ?? [];
+            $bookAuthors = $tables['bookAuthors'] ?? [];
+
+            foreach ($authors as $author) {
+                Author::updateOrCreate(
+                    ['id' => $author['id']],
+                    [
+                        'name' => trim($author['name']),
+                        'created_at' => $author['createdAt'] ?? now(),
+                        'updated_at' => $author['createdAt'] ?? now(),
+                    ]
+                );
+            }
+
+            foreach ($books as $item) {
+                Book::updateOrCreate(
+                    ['id' => $item['id']],
+                    [
+                        'isbn' => $item['isbn'],
+                        'title' => $item['title'],
+                        'original_title' => $item['originalTitle'] ?? $item['title'],
+                        'google_books_id' => $item['googleBooksId'] ?? null,
+                        'published_date' => $item['publishedDate'] ?? null,
+                        'language' => $item['language'] ?? 'es',
+                        'synopsis' => $item['synopsis'] ?? null,
+                        'cover_url' => $item['coverUrl'] ?? null,
+                        'additional_images' => $item['additionalImages'] ?? [],
+                        'price' => $item['price'] ?? 0,
+                        'promo_quantity' => $item['promoQuantity'] ?? null,
+                        'promo_price' => $item['promoPrice'] ?? null,
+                        'stock' => $item['stock'] ?? 0,
+                        'badge' => $item['badge'] ?? null,
+                        'genre' => $item['genre'] ?? null,
+                        'is_active' => $item['isActive'] ?? true,
+                        'created_at' => $item['createdAt'] ?? now(),
+                        'updated_at' => $item['updatedAt'] ?? now(),
+                    ]
+                );
+            }
+
+            foreach ($bookAuthors as $ba) {
+                DB::table('book_authors')->updateOrInsert(
+                    [
+                        'book_id' => $ba['bookId'],
+                        'author_id' => $ba['authorId'],
+                    ]
+                );
+            }
+
+            return;
+        }
+
+        // Fallback en caso de que no exista el archivo de backup
         $books = [
             [
                 'title' => 'Boulevard Eterno',
