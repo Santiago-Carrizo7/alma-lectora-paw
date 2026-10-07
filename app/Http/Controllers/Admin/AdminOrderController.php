@@ -4,13 +4,27 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\OrderLead;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response as HttpResponse;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class AdminOrderController extends Controller
 {
+    /**
+     * Generate a PDF dispatch/packing slip (remito) for the given order.
+     */
+    public function remito(OrderLead $order): HttpResponse
+    {
+        $pdf = Pdf::loadView('pdf.order-remito', compact('order'))
+            ->setPaper('a4', 'portrait');
+
+        $shortId = strtoupper(substr($order->id, 0, 8));
+
+        return $pdf->stream("remito-orden-{$shortId}.pdf");
+    }
     /**
      * Display a listing of order leads categorized by status tabs.
      */

@@ -72,6 +72,15 @@ class OrderLeadController extends Controller
             'status' => 'PENDING_WHATSAPP',
         ]);
 
+        if (!empty($orderLead->customer_email)) {
+            try {
+                \Illuminate\Support\Facades\Mail::to($orderLead->customer_email)
+                    ->send(new \App\Mail\OrderConfirmationMail($orderLead));
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning("No se pudo enviar email de confirmación para orden {$orderLead->id}: " . $e->getMessage());
+            }
+        }
+
         return response()->json([
             'success' => true,
             'orderId' => $orderLead->id,
