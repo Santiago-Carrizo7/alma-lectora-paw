@@ -39,6 +39,7 @@ Route::prefix('admin')->middleware(['auth', 'admin'])->name('admin.')->group(fun
     // Libros
     Route::prefix('libros')->name('books.')->group(function () {
         Route::get('/', [AdminBookController::class, 'index'])->name('index');
+        Route::get('/export', [AdminBookController::class, 'export'])->name('export');
         Route::get('/nuevo', [AdminBookController::class, 'create'])->name('create');
         Route::post('/', [AdminBookController::class, 'store'])->name('store');
         Route::get('/{book}/editar', [AdminBookController::class, 'edit'])->name('edit');
@@ -53,6 +54,7 @@ Route::prefix('admin')->middleware(['auth', 'admin'])->name('admin.')->group(fun
     // Accesorios
     Route::prefix('accesorios')->name('accessories.')->group(function () {
         Route::get('/', [AdminAccessoryController::class, 'index'])->name('index');
+        Route::get('/export', [AdminAccessoryController::class, 'export'])->name('export');
         Route::get('/nuevo', [AdminAccessoryController::class, 'create'])->name('create');
         Route::post('/', [AdminAccessoryController::class, 'store'])->name('store');
         Route::get('/{accessory}/editar', [AdminAccessoryController::class, 'edit'])->name('edit');
@@ -67,6 +69,7 @@ Route::prefix('admin')->middleware(['auth', 'admin'])->name('admin.')->group(fun
     // Combos
     Route::prefix('combos')->name('combos.')->group(function () {
         Route::get('/', [AdminComboController::class, 'index'])->name('index');
+        Route::get('/export', [AdminComboController::class, 'export'])->name('export');
         Route::get('/nuevo', [AdminComboController::class, 'create'])->name('create');
         Route::post('/', [AdminComboController::class, 'store'])->name('store');
         Route::get('/{combo}/editar', [AdminComboController::class, 'edit'])->name('edit');
@@ -81,6 +84,7 @@ Route::prefix('admin')->middleware(['auth', 'admin'])->name('admin.')->group(fun
     // Pedidos
     Route::prefix('pedidos')->name('orders.')->group(function () {
         Route::get('/', [AdminOrderController::class, 'index'])->name('index');
+        Route::get('/{order}/remito', [AdminOrderController::class, 'remito'])->name('remito');
         Route::patch('/{order}/estado', [AdminOrderController::class, 'updateStatus'])->name('update-status');
         Route::delete('/{order}', [AdminOrderController::class, 'destroy'])->name('destroy');
     });
