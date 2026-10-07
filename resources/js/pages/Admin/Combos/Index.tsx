@@ -132,6 +132,14 @@ export function Index({ combos, filters, counts }: IndexProps) {
 
     const isArchivedTab = filters.tab === 'archived';
 
+    const handleExportExcel = () => {
+        const params = new URLSearchParams({
+            search: search || '',
+            tab: filters.tab || 'available',
+        });
+        window.location.href = `/admin/combos/export?${params.toString()}`;
+    };
+
     return (
         <AdminLayout
             title="Gestión de Combos"
@@ -139,15 +147,28 @@ export function Index({ combos, filters, counts }: IndexProps) {
             breadcrumbText="Volver al Panel Central"
             breadcrumbHref="/admin"
             action={
-                <Link
-                    href="/admin/combos/nuevo"
-                    className="bg-forest hover:bg-forest-light inline-flex items-center gap-1.5 rounded-xl px-4 py-2.5 font-serif text-xs font-bold text-white shadow-xs transition-colors"
-                >
-                    <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                    </svg>
-                    Nuevo Combo
-                </Link>
+                <div className="flex items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={handleExportExcel}
+                        className="border-paper-dark hover:bg-paper-dark/60 text-ink-muted hover:text-ink bg-paper inline-flex cursor-pointer items-center gap-1.5 rounded-xl border px-3.5 py-2.5 font-serif text-xs font-semibold shadow-xs transition-colors"
+                        title="Descargar catálogo de combos en Excel"
+                    >
+                        <svg className="h-4 w-4 text-emerald-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        Exportar Excel
+                    </button>
+                    <Link
+                        href="/admin/combos/nuevo"
+                        className="bg-forest hover:bg-forest-light inline-flex items-center gap-1.5 rounded-xl px-4 py-2.5 font-serif text-xs font-bold text-white shadow-xs transition-colors"
+                    >
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                        </svg>
+                        Nuevo Combo
+                    </Link>
+                </div>
             }
         >
             <Head title="Gestión de Combos - Admin" />

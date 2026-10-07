@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Exports\CombosExport;
 use App\Http\Controllers\Controller;
 use App\Models\Accessory;
 use App\Models\Book;
@@ -13,9 +14,24 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class AdminComboController extends Controller
 {
+    /**
+     * Export combos catalog to Excel preserving current filters.
+     */
+    public function export(Request $request): BinaryFileResponse
+    {
+        $filters = [
+            'search' => $request->input('search', ''),
+            'tab' => $request->input('tab', 'available'),
+        ];
+
+        return Excel::download(new CombosExport($filters), 'catalogo-combos-alma-lectora.xlsx');
+    }
+
     /**
      * Display a listing of promotional combos.
      */

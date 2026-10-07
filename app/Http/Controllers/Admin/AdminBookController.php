@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Exports\BooksExport;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\StoreBookRequest;
 use App\Http\Requests\Admin\UpdateBookRequest;
@@ -14,9 +15,24 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class AdminBookController extends Controller
 {
+    /**
+     * Export books catalog to Excel preserving current filters.
+     */
+    public function export(Request $request): BinaryFileResponse
+    {
+        $filters = [
+            'search' => $request->input('search', ''),
+            'tab' => $request->input('tab', 'available'),
+        ];
+
+        return Excel::download(new BooksExport($filters), 'catalogo-libros-alma-lectora.xlsx');
+    }
+
     /**
      * Display a listing of books with pagination, tabs and search.
      */
@@ -62,7 +78,7 @@ class AdminBookController extends Controller
     }
 
     /**
-     * Store a newly created book in storage.
+     * Create a new book and synchronize its authors inside a database transaction.
      */
     public function store(StoreBookRequest $request): RedirectResponse
     {
@@ -117,7 +133,7 @@ class AdminBookController extends Controller
     }
 
     /**
-     * Update the specified book in storage.
+     * Update the specified book and synchronize its authors inside a database transaction.
      */
     public function update(UpdateBookRequest $request, Book $book): RedirectResponse
     {
@@ -178,7 +194,7 @@ class AdminBookController extends Controller
     }
 
     /**
-     * Restore the specified soft-deleted book.
+     * Restore the specified soft-deleted book from the trash.
      */
     public function restore(string $id): RedirectResponse
     {
@@ -189,7 +205,7 @@ class AdminBookController extends Controller
     }
 
     /**
-     * Remove the specified book permanently from storage.
+     * Remove the specified book permanently from storage, cascading pivot relationships.
      */
     public function forceDestroy(string $id): RedirectResponse
     {

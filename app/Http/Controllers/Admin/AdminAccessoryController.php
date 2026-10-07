@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Exports\AccessoriesExport;
 use App\Http\Controllers\Controller;
 use App\Models\Accessory;
 use App\Models\AccessoryCategory;
@@ -9,9 +10,25 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class AdminAccessoryController extends Controller
 {
+    /**
+     * Export accessories catalog to Excel preserving current filters.
+     */
+    public function export(Request $request): BinaryFileResponse
+    {
+        $filters = [
+            'search' => $request->input('search', ''),
+            'category' => $request->input('category', ''),
+            'tab' => $request->input('tab', 'available'),
+        ];
+
+        return Excel::download(new AccessoriesExport($filters), 'catalogo-accesorios-alma-lectora.xlsx');
+    }
+
     /**
      * Display a listing of accessories with pagination, filters and tabs.
      */
