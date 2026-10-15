@@ -18,6 +18,8 @@ class AdminOrderController extends Controller
      */
     public function remito(OrderLead $order): HttpResponse
     {
+        \Illuminate\Support\Facades\Gate::authorize('view', $order);
+
         $pdf = Pdf::loadView('pdf.order-remito', compact('order'))
             ->setPaper('a4', 'portrait');
 

@@ -15,12 +15,31 @@ type CheckoutStep = 0 | 1 | 2;
 
 export default function CheckoutIndex() {
     const { props } = usePage<SharedData>();
+    const user = props.auth?.user as Record<string, any> | null;
     const storeConfig = props.storeConfig;
     const { items, totalAmount, clearCart } = useCart();
 
     const [step, setStep] = useState<CheckoutStep>(0);
-    const [shipping, setShipping] = useState<ShippingFormData | null>(null);
-    const [customer, setCustomer] = useState<CustomerFormData | null>(null);
+    const [shipping, setShipping] = useState<ShippingFormData | null>(() => {
+        if (user && (user.address || user.postal_code)) {
+            return {
+                postalCode: (user.postal_code as string) || '',
+                address: (user.address as string) || '',
+            };
+        }
+        return null;
+    });
+    const [customer, setCustomer] = useState<CustomerFormData | null>(() => {
+        if (user) {
+            return {
+                customerName: user.name || '',
+                customerEmail: user.email || '',
+                customerDni: (user.dni as string) || '',
+                customerPhone: (user.phone as string) || '',
+            };
+        }
+        return null;
+    });
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -161,6 +180,30 @@ export default function CheckoutIndex() {
             <Head title="Finalizar Compra — Checkout | Alma Lectora" />
 
             <div className="mx-auto max-w-2xl py-6">
+                {/* Banner de Usuario / Invitado */}
+                {user ? (
+                    <div className="mb-4 bg-forest/10 border border-forest/30 text-forest text-xs rounded-xl p-3 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+                            </svg>
+                            <span>Comprando como <strong>{user.name}</strong> ({user.email}). Tus datos se han precargado.</span>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="mb-4 bg-amber-50 border border-amber-200 text-amber-900 text-xs rounded-xl p-3 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <svg className="w-4 h-4 shrink-0 text-amber-700" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+                            </svg>
+                            <span>¿Ya tenés cuenta en Alma Lectora?</span>
+                        </div>
+                        <Link href="/login" className="text-forest hover:underline font-bold font-serif shrink-0">
+                            Iniciá sesión aquí →
+                        </Link>
+                    </div>
+                )}
+
                 <div className="border-paper-dark/60 bg-paper-dark/10 rounded-xl border p-6 shadow-sm sm:p-8">
                     {/* Stepper Header */}
                     <StepIndicator steps={stepsLabels} currentStep={step} />

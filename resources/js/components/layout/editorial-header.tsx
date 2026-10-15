@@ -2,10 +2,12 @@ import type { SharedData } from '@/types';
 import { Link, router, usePage } from '@inertiajs/react';
 import { useCart } from '../../lib/cart-store';
 import { CartDrawer } from '../cart/cart-drawer';
+import { useAuth } from '../../hooks/use-auth';
 
 export function EditorialHeader() {
     const { props, url } = usePage<SharedData>();
     const user = props.auth?.user;
+    const { isAdmin, isSuperAdmin } = useAuth();
     const isAdminRoute = url.startsWith('/admin');
     const { openCart, totalItems } = useCart();
 
@@ -73,7 +75,21 @@ export function EditorialHeader() {
                     {user ? (
                         <div className="flex items-center gap-2 sm:gap-3">
                             <span className="text-ink-muted hidden text-xs font-medium md:inline-block">{user.name}</span>
-                            {user.role === 'admin' && (
+                            <Link
+                                href="/mis-compras"
+                                className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                                    url.startsWith('/mis-compras')
+                                        ? 'bg-forest text-stone-100 border-forest'
+                                        : 'border-paper-dark/60 text-ink hover:text-forest hover:bg-paper-dark'
+                                }`}
+                                title="Ver mis compras realizadas"
+                            >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5V6a3.75 3.75 0 1 0-7.5 0v4.5m11.356-1.993 1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h12.974c.576 0 1.059.435 1.119 1.007ZM8.625 10.5a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm7.5 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
+                                </svg>
+                                <span>Mis Compras</span>
+                            </Link>
+                            {(isAdmin || isSuperAdmin || user.role === 'admin') && (
                                 <Link
                                     href="/admin"
                                     className="border-forest/30 text-forest hover:bg-forest/10 flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors"

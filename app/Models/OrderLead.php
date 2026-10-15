@@ -13,6 +13,7 @@ class OrderLead extends Model
     protected $table = 'order_leads';
 
     protected $fillable = [
+        'user_id',
         'customer_name',
         'customer_phone',
         'customer_email',
@@ -28,4 +29,9 @@ class OrderLead extends Model
         'items' => 'array',
         'total_amount' => 'decimal:2',
     ];
+
+    public function user(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(User::class, 'user_id');
+    }
 }

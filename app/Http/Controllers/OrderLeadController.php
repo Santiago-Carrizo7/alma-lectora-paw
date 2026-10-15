@@ -61,6 +61,7 @@ class OrderLeadController extends Controller
         }
 
         $orderLead = OrderLead::create([
+            'user_id' => $request->user()?->id,
             'customer_name' => $request->input('customer_name'),
             'customer_phone' => $request->input('customer_phone'),
             'customer_email' => $request->input('customer_email'),
