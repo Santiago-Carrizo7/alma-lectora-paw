@@ -35,6 +35,7 @@ export function AdminLayout({
     const isCombosArea = url.includes('/combos');
     const isOrdersArea = url.includes('/pedidos');
     const isConfigArea = url.includes('/configuracion');
+    const isReportsArea = url.includes('/reportes');
 
     // Default breadcrumb logic matching original client
     const defaultBreadcrumbText = isHubMode ? 'Volver al Catálogo' : 'Volver al Panel Central';
@@ -82,6 +83,9 @@ export function AdminLayout({
         } else if (isConfigArea) {
             defaultTitle = 'Configuración de Tienda';
             defaultSubtitle = 'Ajustes de contacto, costos de logística y catálogo dinámico';
+        } else if (isReportsArea) {
+            defaultTitle = 'Reportes y Analítica Gerencial';
+            defaultSubtitle = 'Indicadores de negocio, ranking de compradores y rotación de libros';
         } else {
             defaultTitle = 'Panel de Libros';
             defaultSubtitle = 'Mantenimiento de inventario, ABM y carga rápida con escáner';

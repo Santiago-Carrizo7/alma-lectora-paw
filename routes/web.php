@@ -3,6 +3,7 @@
 use App\Http\Controllers\AccessoryController;
 use App\Http\Controllers\BookController;
 use App\Http\Controllers\ComboController;
+use App\Http\Controllers\CustomerOrderController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\OrderLeadController;
 use Illuminate\Support\Facades\Route;
@@ -14,6 +15,10 @@ use App\Http\Controllers\Admin\AdminComboController;
 use App\Http\Controllers\Admin\AdminConfigController;
 use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\AdminOrderController;
+use App\Http\Controllers\Admin\AdminPermissionController;
+use App\Http\Controllers\Admin\AdminReportController;
+use App\Http\Controllers\Admin\AdminRoleController;
+use App\Http\Controllers\Admin\AdminUserController;
 
 Route::get('/', [HomeController::class, 'index'])->name('home');
 Route::get('/libros', [BookController::class, 'index'])->name('books.index');
@@ -31,6 +36,10 @@ Route::middleware(['auth'])->group(function () {
     Route::get('dashboard', function () {
         return Inertia::render('dashboard');
     })->name('dashboard');
+
+    // Portal de Compras del Cliente
+    Route::get('/mis-compras', [CustomerOrderController::class, 'index'])->name('customer.orders.index');
+    Route::get('/mis-compras/{order}/remito', [CustomerOrderController::class, 'remito'])->name('customer.orders.remito');
 });
 
 Route::prefix('admin')->middleware(['auth', 'admin'])->name('admin.')->group(function () {
@@ -97,6 +106,20 @@ Route::prefix('admin')->middleware(['auth', 'admin'])->name('admin.')->group(fun
         Route::delete('/categorias/{category}', [AdminConfigController::class, 'destroyCategory'])->name('category-destroy');
         Route::put('/generos', [AdminConfigController::class, 'updateGenre'])->name('genre-update');
         Route::delete('/generos', [AdminConfigController::class, 'destroyGenre'])->name('genre-destroy');
+    });
+
+    // Reportes Gerenciales y Analítica
+    Route::prefix('reportes')->name('reports.')->group(function () {
+        Route::get('/', [AdminReportController::class, 'index'])->name('index');
+        Route::get('/pdf', [AdminReportController::class, 'pdf'])->name('pdf');
+        Route::get('/excel', [AdminReportController::class, 'excel'])->name('excel');
+    });
+
+    // Gestión de Usuarios, Roles y Permisos (Exclusivo Super-Admin)
+    Route::middleware(['role:super-admin'])->group(function () {
+        Route::resource('usuarios', AdminUserController::class)->parameters(['usuarios' => 'user'])->names('users');
+        Route::resource('roles', AdminRoleController::class)->parameters(['roles' => 'role'])->names('roles');
+        Route::resource('permisos', AdminPermissionController::class)->parameters(['permisos' => 'permission'])->except(['create', 'show', 'edit'])->names('permissions');
     });
 });
 
