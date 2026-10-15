@@ -2,7 +2,9 @@ import { LucideIcon } from 'lucide-react';
 import type { StoreConfig } from './alma';
 
 export interface Auth {
-    user: User;
+    user: User | null;
+    roles?: string[];
+    permissions?: string[];
 }
 
 export interface BreadcrumbItem {
@@ -20,6 +22,8 @@ export interface NavItem {
     url: string;
     icon?: LucideIcon | null;
     isActive?: boolean;
+    permission?: string;
+    role?: string;
 }
 
 export interface SharedData {
