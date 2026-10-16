@@ -49,4 +49,16 @@ class UserFactory extends Factory
             'is_active' => true,
         ]);
     }
+
+    public function client(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'role' => 'client',
+            'is_active' => true,
+            'dni' => (string) fake()->numberBetween(25000000, 46000000),
+            'phone' => '+54 9 387 ' . fake()->numerify('###-####'),
+            'address' => fake()->streetAddress(),
+            'postal_code' => fake()->randomElement(['4400', '4401', '4405', '4407']),
+        ]);
+    }
 }

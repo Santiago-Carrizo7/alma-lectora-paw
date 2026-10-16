@@ -35,7 +35,21 @@ class BookSeeder extends Seeder
                 );
             }
 
+            $index = 0;
             foreach ($books as $item) {
+                $index++;
+                // Distribución de stock realista y variada (solicitada: varios en 5, algunos en 1-2, otros en 8-12 y agotados)
+                $variedStock = match ($index % 12) {
+                    0 => 0,          // Agotado
+                    1, 2 => 1,       // Stock crítico (1 unidad)
+                    3, 4 => 2,       // Stock crítico (2 unidades)
+                    5 => 3,          // Límite de stock crítico (3 unidades)
+                    6, 7 => 5,       // Stock solicitado de 5 unidades
+                    8, 9 => 8,       // Buen stock
+                    10 => 12,        // Stock abundante
+                    default => 6,    // Stock regular
+                };
+
                 Book::updateOrCreate(
                     ['id' => $item['id']],
                     [
@@ -51,7 +65,7 @@ class BookSeeder extends Seeder
                         'price' => $item['price'] ?? 0,
                         'promo_quantity' => $item['promoQuantity'] ?? null,
                         'promo_price' => $item['promoPrice'] ?? null,
-                        'stock' => $item['stock'] ?? 0,
+                        'stock' => $variedStock,
                         'badge' => $item['badge'] ?? null,
                         'genre' => $item['genre'] ?? null,
                         'is_active' => $item['isActive'] ?? true,

@@ -180,5 +180,13 @@ class RolesAndPermissionsSeeder extends Seeder
                 $u->assignRole($roleAdmin);
             }
         }
+
+        // Asignar rol client a clientes registrados
+        $existingClients = User::where('role', 'client')->get();
+        foreach ($existingClients as $u) {
+            if (!$u->hasAnyRole(Role::all())) {
+                $u->assignRole($roleClient);
+            }
+        }
     }
 }

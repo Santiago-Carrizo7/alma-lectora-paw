@@ -34,7 +34,18 @@ class AccessorySeeder extends Seeder
                 );
             }
 
+            $accIndex = 0;
             foreach ($accessories as $acc) {
+                $accIndex++;
+                $variedStock = match ($accIndex % 8) {
+                    0 => 0,       // Agotado
+                    1 => 2,       // Stock crítico (2 unidades)
+                    2 => 3,       // Stock crítico (3 unidades)
+                    3, 4 => 5,    // Stock moderado (5 unidades)
+                    5, 6 => 8,    // Stock saludable
+                    default => 15,// Abundante
+                };
+
                 Accessory::updateOrCreate(
                     ['id' => $acc['id']],
                     [
@@ -43,7 +54,7 @@ class AccessorySeeder extends Seeder
                         'price' => $acc['price'] ?? 0,
                         'promo_quantity' => $acc['promoQuantity'] ?? null,
                         'promo_price' => $acc['promoPrice'] ?? null,
-                        'stock' => $acc['stock'] ?? 0,
+                        'stock' => $variedStock,
                         'category' => $acc['category'],
                         'cover_url' => $acc['coverUrl'] ?? null,
                         'additional_images' => $acc['additionalImages'] ?? [],
