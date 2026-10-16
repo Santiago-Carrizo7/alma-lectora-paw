@@ -76,7 +76,7 @@ export default function ReportsIndex({ report }: ReportProps) {
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3.5 py-2 text-xs font-semibold text-red-700 shadow-xs transition hover:bg-red-100"
-                title="Descargar informe ejecutivo en PDF"
+                title="Descargar reporte en PDF"
             >
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
@@ -88,114 +88,27 @@ export default function ReportsIndex({ report }: ReportProps) {
             <a
                 href="/admin/reportes/excel"
                 className="inline-flex items-center gap-2 rounded-xl bg-forest px-3.5 py-2 text-xs font-semibold text-white shadow-xs transition hover:bg-forest-dark"
-                title="Descargar libro Excel multi-hoja con fórmulas vivas"
+                title="Descargar reporte en Excel"
             >
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3v11.25A2.25 2.25 0 0 0 6 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0 1 18 16.5h-2.25m-7.5 0h7.5m-7.5 0-1 3m8.5-3 1 3m0 0 .5 1.5m-.5-1.5h-9.5m0 0-.5 1.5m.75-9 3-3 2.148 2.148A12.061 12.061 0 0 1 16.5 7.605" />
                 </svg>
-                <span>Exportar Excel (Multi-Hoja)</span>
+                <span>Exportar Excel</span>
             </a>
         </div>
     );
 
     return (
         <AdminLayout
-            title="Reportes y Analítica Gerencial"
-            subtitle="Cálculos de rendimiento comercial, ranking de compradores y rotación de catálogo"
+            title="Reportes y Estadísticas"
+            subtitle="Ventas, clientes destacados y estado del inventario"
             breadcrumbText="Volver al Panel Central"
             breadcrumbHref="/admin"
             action={actionButtons}
         >
-            <Head title="Reportes y Analítica - Alma Lectora" />
+            <Head title="Reportes y Estadísticas - Alma Lectora" />
 
             <div className="space-y-6">
-                {/* Audit metadata strip */}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded-xl border border-paper-dark/60 bg-paper-light/50 px-4 py-2.5 text-xs text-ink-muted">
-                    <div className="flex items-center gap-2">
-                        <span className="h-2 w-2 rounded-full bg-forest animate-pulse"></span>
-                        <span>Motor de analítica en tiempo real &bull; Alma Lectora Intelligence</span>
-                    </div>
-                    <div>
-                        Último cálculo: <strong className="text-ink">{report.generated_at}</strong>
-                    </div>
-                </div>
-
-                {/* KPI Cards Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {/* Card 1: Revenue */}
-                    <div className="rounded-2xl border border-forest/20 bg-forest/5 p-5 shadow-xs">
-                        <p className="text-xs font-semibold uppercase tracking-wider text-forest">
-                            Ventas Facturadas
-                        </p>
-                        <p className="mt-2 font-serif text-2xl sm:text-3xl font-bold text-forest">
-                            {formatPrice(kpis.total_revenue)}
-                        </p>
-                        <div className="mt-2 flex items-center justify-between text-xs text-ink-muted">
-                            <span>Órdenes confirmadas</span>
-                            <span className="font-semibold text-ink">{kpis.confirmed_orders} pedidos</span>
-                        </div>
-                    </div>
-
-                    {/* Card 2: Conversion Rate */}
-                    <div className="rounded-2xl border border-paper-dark/60 bg-paper-light p-5 shadow-xs">
-                        <p className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
-                            Conversión WhatsApp
-                        </p>
-                        <p className="mt-2 font-serif text-2xl sm:text-3xl font-bold text-ink">
-                            {kpis.conversion_rate}%
-                        </p>
-                        <div className="mt-2 flex items-center justify-between text-xs text-ink-muted">
-                            <span>Efectividad de cierre</span>
-                            <span className="font-semibold text-emerald-700">
-                                {kpis.confirmed_orders} / {kpis.total_orders}
-                            </span>
-                        </div>
-                    </div>
-
-                    {/* Card 3: Average Ticket */}
-                    <div className="rounded-2xl border border-paper-dark/60 bg-paper-light p-5 shadow-xs">
-                        <p className="text-xs font-semibold uppercase tracking-wider text-ink-muted">
-                            Ticket Promedio
-                        </p>
-                        <p className="mt-2 font-serif text-2xl sm:text-3xl font-bold text-ink">
-                            {formatPrice(kpis.average_ticket)}
-                        </p>
-                        <div className="mt-2 flex items-center justify-between text-xs text-ink-muted">
-                            <span>Promedio por orden</span>
-                            <span className="font-semibold text-ink">{kpis.units_sold} libros vendidos</span>
-                        </div>
-                    </div>
-
-                    {/* Card 4: Inventory Alert */}
-                    <div
-                        className={`rounded-2xl border p-5 shadow-xs ${
-                            kpis.critical_stock_count > 0
-                                ? 'border-amber-200 bg-amber-50/50'
-                                : 'border-paper-dark/60 bg-paper-light'
-                        }`}
-                    >
-                        <p
-                            className={`text-xs font-semibold uppercase tracking-wider ${
-                                kpis.critical_stock_count > 0 ? 'text-amber-800' : 'text-ink-muted'
-                            }`}
-                        >
-                            Stock Crítico (&le; 3)
-                        </p>
-                        <p
-                            className={`mt-2 font-serif text-2xl sm:text-3xl font-bold ${
-                                kpis.critical_stock_count > 0 ? 'text-amber-900' : 'text-ink'
-                            }`}
-                        >
-                            {kpis.critical_stock_count}{' '}
-                            <span className="text-xs font-normal text-ink-muted">títulos</span>
-                        </p>
-                        <div className="mt-2 flex items-center justify-between text-xs text-ink-muted">
-                            <span>Catálogo total</span>
-                            <span className="font-semibold text-ink">{kpis.catalog_size} títulos</span>
-                        </div>
-                    </div>
-                </div>
-
                 {/* Tabs Navigation */}
                 <div className="border-b border-paper-dark/60">
                     <nav className="-mb-px flex space-x-4 sm:space-x-8 overflow-x-auto">
@@ -258,7 +171,7 @@ export default function ReportsIndex({ report }: ReportProps) {
                                     Ranking de Clientes Destacados
                                 </h3>
                                 <p className="text-xs text-ink-muted">
-                                    Calculado según volumen y monto neto acumulado en compras confirmadas
+                                    Clientes con más compras confirmadas en la tienda
                                 </p>
                             </div>
                         </div>
@@ -334,7 +247,7 @@ export default function ReportsIndex({ report }: ReportProps) {
                                     Libros Más Vendidos
                                 </h3>
                                 <p className="text-xs text-ink-muted">
-                                    Títulos con mayor número de ejemplares colocados en órdenes confirmadas
+                                    Los libros con mayor cantidad de unidades vendidas
                                 </p>
                             </div>
                         </div>
@@ -349,7 +262,7 @@ export default function ReportsIndex({ report }: ReportProps) {
                                         <th className="px-4 py-3">Autores</th>
                                         <th className="px-4 py-3 text-center">Unidades</th>
                                         <th className="px-4 py-3 text-right">Facturación</th>
-                                        <th className="px-4 py-3 text-center">Stock Remanente</th>
+                                        <th className="px-4 py-3 text-center">Stock actual</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-paper-dark/40">
@@ -394,10 +307,10 @@ export default function ReportsIndex({ report }: ReportProps) {
                         <div className="px-5 py-4 border-b border-paper-dark/40 bg-paper-light/70 flex items-center justify-between">
                             <div>
                                 <h3 className="font-serif text-sm sm:text-base font-bold text-ink">
-                                    Libros con Menor Rotación (0 Ventas)
+                                    Libros con Menor Rotación (Sin Ventas)
                                 </h3>
                                 <p className="text-xs text-ink-muted">
-                                    Títulos en catálogo activo que aún no registran salidas para planificar promociones
+                                    Libros del catálogo que todavía no registran ventas
                                 </p>
                             </div>
                         </div>
@@ -411,7 +324,7 @@ export default function ReportsIndex({ report }: ReportProps) {
                                         <th className="px-4 py-3">Autores</th>
                                         <th className="px-4 py-3">Género</th>
                                         <th className="px-4 py-3 text-right">Precio</th>
-                                        <th className="px-4 py-3 text-center">Stock Inmovilizado</th>
+                                        <th className="px-4 py-3 text-center">Stock actual</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-paper-dark/40">
@@ -451,10 +364,10 @@ export default function ReportsIndex({ report }: ReportProps) {
                         <div className="px-5 py-4 border-b border-red-100 bg-red-50/60 flex items-center justify-between">
                             <div>
                                 <h3 className="font-serif text-sm sm:text-base font-bold text-red-900">
-                                    Alertas de Reposición Prioritaria
+                                    Alertas de Stock
                                 </h3>
                                 <p className="text-xs text-red-700">
-                                    Títulos con stock igual o inferior a 3 unidades o totalmente agotados
+                                    Libros con 3 o menos unidades disponibles o agotados
                                 </p>
                             </div>
                         </div>

@@ -30,7 +30,7 @@ class ExecutiveSummarySheet implements
 
     public function title(): string
     {
-        return 'Resumen Gerencial';
+        return 'Resumen General';
     }
 
     public function startCell(): string
@@ -41,11 +41,11 @@ class ExecutiveSummarySheet implements
     public function headings(): array
     {
         return [
-            'Categoría Estratégica',
-            'Indicador Clave (KPI)',
-            'Valor Calculado',
-            'Unidad de Medida',
-            'Observación y Análisis',
+            'Categoría',
+            'Indicador',
+            'Valor',
+            'Unidad',
+            'Detalle',
         ];
     }
 
@@ -55,74 +55,74 @@ class ExecutiveSummarySheet implements
 
         return [
             [
-                'Rendimiento Comercial',
-                'Ingresos Totales Facturados',
+                'Ventas',
+                'Total de ventas',
                 (float) ($k['total_revenue'] ?? 0),
                 'ARS ($)',
-                'Importe neto acumulado de pedidos confirmados',
+                'Total acumulado en pedidos confirmados',
             ],
             [
-                'Rendimiento Comercial',
-                'Ticket Promedio por Pedido',
+                'Ventas',
+                'Ticket promedio',
                 (float) ($k['average_ticket'] ?? 0),
                 'ARS ($)',
-                'Ingreso medio obtenido en cada transacción confirmada',
+                'Promedio por cada compra confirmada',
             ],
             [
-                'Volumen de Operaciones',
-                'Total de Pedidos Registrados',
+                'Pedidos',
+                'Total de pedidos',
                 (int) ($k['total_orders'] ?? 0),
                 'Pedidos',
-                'Volumen total de pedidos ingresados al sistema',
+                'Cantidad total de pedidos recibidos',
             ],
             [
-                'Volumen de Operaciones',
-                'Pedidos Confirmados y Despachados',
+                'Pedidos',
+                'Pedidos confirmados',
                 (int) ($k['confirmed_orders'] ?? 0),
                 'Pedidos',
-                'Pedidos cerrados exitosamente con entrega o pago',
+                'Compras confirmadas',
             ],
             [
-                'Volumen de Operaciones',
-                'Pedidos Pendientes (WhatsApp)',
+                'Pedidos',
+                'Pedidos pendientes',
                 (int) ($k['pending_orders'] ?? 0),
                 'Pedidos',
-                'Operaciones en etapa de contacto y confirmación',
+                'En espera de confirmación',
             ],
             [
-                'Volumen de Operaciones',
-                'Pedidos Cancelados',
+                'Pedidos',
+                'Pedidos cancelados',
                 (int) ($k['cancelled_orders'] ?? 0),
                 'Pedidos',
-                'Pedidos desestimados por el comprador o falta de stock',
+                'Pedidos que no se concretaron',
             ],
             [
-                'Efectividad Comercial',
-                'Tasa de Conversión WhatsApp',
+                'Efectividad',
+                'Porcentaje de confirmación',
                 ($k['total_orders'] ?? 0) > 0 ? (($k['confirmed_orders'] ?? 0) / ($k['total_orders'] ?? 1)) : 0,
                 'Porcentaje (%)',
-                'Efectividad de cierre sobre los pedidos iniciados',
+                'Porcentaje de pedidos confirmados sobre el total',
             ],
             [
-                'Catálogo e Inventario',
-                'Unidades Físicas de Libros Vendidas',
+                'Catálogo y Stock',
+                'Libros vendidos',
                 (int) ($k['units_sold'] ?? 0),
-                'Ejemplares',
-                'Cantidad total de volúmenes vendidos en órdenes confirmadas',
+                'Unidades',
+                'Total de libros en pedidos confirmados',
             ],
             [
-                'Catálogo e Inventario',
-                'Variedad de Catálogo Activo',
+                'Catálogo y Stock',
+                'Libros en catálogo',
                 (int) ($k['catalog_size'] ?? 0),
-                'Títulos',
-                'Catálogo de libros disponibles para la venta',
+                'Libros',
+                'Libros activos en la tienda',
             ],
             [
-                'Catálogo e Inventario',
-                'Títulos con Stock Crítico (<= 3)',
+                'Catálogo y Stock',
+                'Libros con poco stock (<= 3)',
                 (int) ($k['critical_stock_count'] ?? 0),
-                'Títulos',
-                'Alerta de reposición inmediata en bodega',
+                'Libros',
+                'Libros con 3 o menos unidades',
             ],
         ];
     }
@@ -135,7 +135,7 @@ class ExecutiveSummarySheet implements
 
                 // 1. Banner Superior (A1:E1)
                 $sheet->mergeCells('A1:E1');
-                $sheet->setCellValue('A1', 'ALMA LECTORA  |  INFORME GERENCIAL Y RENDIMIENTO DE NEGOCIO');
+                $sheet->setCellValue('A1', 'ALMA LECTORA  |  INFORME DE RENDIMIENTO DE NEGOCIO');
                 $sheet->getRowDimension(1)->setRowHeight(36);
 
                 $sheet->getStyle('A1')->applyFromArray([
@@ -158,8 +158,7 @@ class ExecutiveSummarySheet implements
                 // 2. Metadatos (A2:E2)
                 $sheet->mergeCells('A2:E2');
                 $now = now()->format('d/m/Y H:i:s');
-                $user = auth()->user()?->name ?? 'Dirección';
-                $sheet->setCellValue('A2', "Reporte emitido el {$now} | Responsable: {$user} | Alcance: Histórico Consolidado");
+                $sheet->setCellValue('A2', "Reporte emitido el {$now}");
                 $sheet->getRowDimension(2)->setRowHeight(20);
 
                 $sheet->getStyle('A2')->applyFromArray([

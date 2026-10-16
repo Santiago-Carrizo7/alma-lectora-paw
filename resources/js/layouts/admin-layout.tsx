@@ -84,8 +84,8 @@ export function AdminLayout({
             defaultTitle = 'Configuración de Tienda';
             defaultSubtitle = 'Ajustes de contacto, costos de logística y catálogo dinámico';
         } else if (isReportsArea) {
-            defaultTitle = 'Reportes y Analítica Gerencial';
-            defaultSubtitle = 'Indicadores de negocio, ranking de compradores y rotación de libros';
+            defaultTitle = 'Reportes y Estadísticas';
+            defaultSubtitle = 'Ventas, clientes destacados y estado del inventario';
         } else {
             defaultTitle = 'Panel de Libros';
             defaultSubtitle = 'Mantenimiento de inventario, ABM y carga rápida con escáner';

@@ -43,7 +43,7 @@ class AdminReportController extends Controller
 
         $date = now()->format('Ymd-His');
 
-        return $pdf->stream("informe-gerencial-almalectora-{$date}.pdf");
+        return $pdf->stream("informe-rendimiento-almalectora-{$date}.pdf");
     }
 
     /**
@@ -57,7 +57,7 @@ class AdminReportController extends Controller
 
         return Excel::download(
             new ExecutiveReportExport($reportData),
-            "reporte-gerencial-almalectora-{$date}.xlsx"
+            "reporte-rendimiento-almalectora-{$date}.xlsx"
         );
     }
 }

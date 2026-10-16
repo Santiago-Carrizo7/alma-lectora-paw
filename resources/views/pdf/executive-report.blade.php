@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Informe Ejecutivo de Gestión - Alma Lectora</title>
+    <title>Informe de Rendimiento de Negocio - Alma Lectora</title>
     <style>
         @page {
             margin: 28px 32px;
@@ -160,29 +160,14 @@
             color: #92400e;
         }
 
-        /* Signatures and Footer */
-        .signature-table {
-            width: 100%;
-            margin-top: 28px;
-            border-top: 1px dashed #cbd5e1;
-            padding-top: 18px;
-        }
-        .signature-cell {
-            width: 50%;
-            text-align: center;
-        }
-        .signature-line {
-            width: 180px;
-            border-bottom: 1px solid #475569;
-            margin: 0 auto 6px auto;
-        }
+        /* Footer */
         .footer-note {
-            margin-top: 18px;
-            font-size: 8px;
+            margin-top: 24px;
+            font-size: 9px;
             color: #94a3b8;
             text-align: center;
             border-top: 1px solid #e2e8f0;
-            padding-top: 6px;
+            padding-top: 8px;
         }
     </style>
 </head>
@@ -199,11 +184,9 @@
                 </div>
             </td>
             <td style="width: 45%; vertical-align: top;">
-                <div class="doc-title">INFORME EJECUTIVO GERENCIAL</div>
+                <div class="doc-title">INFORME DE RENDIMIENTO DE NEGOCIO</div>
                 <div class="doc-meta">
-                    <strong>Fecha de Emisión:</strong> {{ $data['generated_at'] }}<br>
-                    <strong>Responsable:</strong> {{ $data['generated_by'] }}<br>
-                    <strong>Tipo:</strong> Métricas Consolidadas y Rotación
+                    <strong>Emitido:</strong> {{ $data['generated_at'] }}
                 </div>
             </td>
         </tr>
@@ -236,7 +219,7 @@
     </table>
 
     <!-- Top Customers -->
-    <div class="section-header">1. Ranking de Clientes Destacados (Top Compradores)</div>
+    <div class="section-header">1. Ranking de Clientes Destacados</div>
     <table class="data-table">
         <thead>
             <tr>
@@ -275,7 +258,7 @@
     </table>
 
     <!-- Top Selling Books -->
-    <div class="section-header">2. Rotación de Catálogo: Libros Más Vendidos</div>
+    <div class="section-header">2. Libros Más Vendidos</div>
     <table class="data-table">
         <thead>
             <tr>
@@ -308,7 +291,7 @@
     </table>
 
     <!-- Critical Stock -->
-    <div class="section-header" style="background-color: #991b1b;">3. Alertas de Inventario: Stock Crítico (&le; 3 unidades)</div>
+    <div class="section-header" style="background-color: #991b1b;">3. Alertas de Stock (&le; 3 unidades)</div>
     <table class="data-table">
         <thead>
             <tr>
@@ -344,25 +327,8 @@
         </tbody>
     </table>
 
-    <!-- Signatures -->
-    <table class="signature-table">
-        <tr>
-            <td class="signature-cell">
-                <div class="signature-line"></div>
-                <strong style="font-size: 10px;">{{ $data['generated_by'] }}</strong><br>
-                <span style="font-size: 9px; color: #64748b;">Responsable de Auditoría y Reportes</span>
-            </td>
-            <td class="signature-cell">
-                <div class="signature-line"></div>
-                <strong style="font-size: 10px;">Dirección Ejecutiva</strong><br>
-                <span style="font-size: 9px; color: #64748b;">Alma Lectora PAW &bull; UNSa</span>
-            </td>
-        </tr>
-    </table>
-
-    <div class="footer-note">
-        Este documento es un reporte gerencial confidencial emitido por el sistema informático Alma Lectora.
-        Página 1 &bull; {{ $data['generated_at'] }}
+    <div class="footer-note" style="margin-top: 24px;">
+        Alma Lectora &bull; Reporte emitido el {{ $data['generated_at'] }}
     </div>
 
 </body>

@@ -138,9 +138,9 @@ class BooksExport implements
                     ],
                 ]);
 
-                // 2. Metadatos de Auditoría y Filtros (A2:H2)
+                // 2. Metadatos y Filtros (A2:H2)
                 $sheet->mergeCells('A2:H2');
-                $metaText = "Generado: {$generatedAt} | Operador: {$userName} | Vista: {$tabLabel} | Filtro Búsqueda: \"{$search}\"";
+                $metaText = "Generado: {$generatedAt} | Usuario: {$userName} | Vista: {$tabLabel} | Filtro: \"{$search}\"";
                 $sheet->setCellValue('A2', $metaText);
                 $sheet->getRowDimension(2)->setRowHeight(20);
 

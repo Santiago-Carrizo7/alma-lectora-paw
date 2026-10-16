@@ -34,7 +34,7 @@ class BooksPerformanceSheet implements
 
     public function title(): string
     {
-        return 'Rotación de Catálogo';
+        return 'Ventas y Rotación';
     }
 
     public function startCell(): string
@@ -50,11 +50,11 @@ class BooksPerformanceSheet implements
             'Título del Libro',
             'Autores',
             'Género',
-            'Precio Unitario ($)',
-            'Unidades Vendidas',
-            'Facturación Generada ($)',
-            'Stock en Bodega',
-            'Nivel de Demanda',
+            'Precio ($)',
+            'Unidades vendidas',
+            'Total ventas ($)',
+            'Stock actual',
+            'Estado',
         ];
     }
 
@@ -75,7 +75,7 @@ class BooksPerformanceSheet implements
                 (int) ($book['units_sold'] ?? 0),
                 (float) ($book['total_revenue'] ?? 0),
                 (int) ($book['stock'] ?? 0),
-                'Alta Demanda',
+                'Más vendido',
             ];
         }
 
@@ -88,7 +88,7 @@ class BooksPerformanceSheet implements
             }
 
             $rows[] = [
-                'Baja Rotación',
+                'Menor rotación',
                 $book['isbn'] ?? 'S/D',
                 $book['title'] ?? 'Sin título',
                 $book['authors'] ?? 'Sin autor',
@@ -97,14 +97,14 @@ class BooksPerformanceSheet implements
                 (int) ($book['units_sold'] ?? 0),
                 (float) ($book['total_revenue'] ?? 0),
                 (int) ($book['stock'] ?? 0),
-                'Baja Demanda',
+                'Baja rotación',
             ];
         }
 
         // 3. Libros Sin Ventas Registradas
         foreach (array_slice($this->noSales, 0, 15) as $book) {
             $rows[] = [
-                'Sin Ventas',
+                'Sin ventas',
                 $book['isbn'] ?? 'S/D',
                 $book['title'] ?? 'Sin título',
                 $book['authors'] ?? 'Sin autor',
@@ -113,7 +113,7 @@ class BooksPerformanceSheet implements
                 0,
                 0.0,
                 (int) ($book['stock'] ?? 0),
-                'Sin Movimiento',
+                'Sin ventas',
             ];
         }
 
@@ -129,7 +129,7 @@ class BooksPerformanceSheet implements
 
                 // 1. Banner
                 $sheet->mergeCells('A1:J1');
-                $sheet->setCellValue('A1', 'ALMA LECTORA  |  ANÁLISIS DE ROTACIÓN, VENTAS Y MOVIMIENTO DE LIBROS');
+                $sheet->setCellValue('A1', 'ALMA LECTORA  |  VENTAS Y ROTACIÓN DE LIBROS');
                 $sheet->getRowDimension(1)->setRowHeight(36);
 
                 $sheet->getStyle('A1')->applyFromArray([
@@ -141,7 +141,7 @@ class BooksPerformanceSheet implements
                 // 2. Subtítulo
                 $sheet->mergeCells('A2:J2');
                 $now = now()->format('d/m/Y H:i:s');
-                $sheet->setCellValue('A2', "Reporte generado el {$now} | Métricas calculadas sobre ítems efectivamente confirmados");
+                $sheet->setCellValue('A2', "Reporte generado el {$now} | Libros más vendidos y menor rotación");
                 $sheet->getRowDimension(2)->setRowHeight(20);
 
                 $sheet->getStyle('A2')->applyFromArray([

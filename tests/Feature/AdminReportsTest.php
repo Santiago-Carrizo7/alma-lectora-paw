@@ -86,7 +86,7 @@ class AdminReportsTest extends TestCase
         $response = $this->get('/admin/reportes/excel');
         $response->assertStatus(200);
 
-        $filename = 'reporte-gerencial-almalectora-' . now()->format('Ymd') . '.xlsx';
+        $filename = 'reporte-rendimiento-almalectora-' . now()->format('Ymd') . '.xlsx';
 
         Excel::assertDownloaded($filename, function (ExecutiveReportExport $export) {
             $sheets = $export->sheets();

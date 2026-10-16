@@ -30,7 +30,7 @@ class CriticalStockSheet implements
 
     public function title(): string
     {
-        return 'Alerta Stock Crítico';
+        return 'Alertas de Stock';
     }
 
     public function startCell(): string
@@ -41,13 +41,13 @@ class CriticalStockSheet implements
     public function headings(): array
     {
         return [
-            'Nivel de Riesgo',
+            'Alerta',
             'ISBN',
             'Título del Libro',
             'Autores',
             'Precio ($)',
-            'Stock Disponible',
-            'Estado Operativo',
+            'Stock',
+            'Estado',
         ];
     }
 
@@ -57,7 +57,7 @@ class CriticalStockSheet implements
 
         foreach ($this->criticalStock as $book) {
             $stock = (int) ($book['stock'] ?? 0);
-            $riesgo = $stock === 0 ? 'CRÍTICO: Agotado' : 'ALERTA: Reposición';
+            $riesgo = $stock === 0 ? 'Agotado' : 'Poco stock';
 
             $rows[] = [
                 $riesgo,
@@ -82,7 +82,7 @@ class CriticalStockSheet implements
 
                 // 1. Banner
                 $sheet->mergeCells('A1:G1');
-                $sheet->setCellValue('A1', 'ALMA LECTORA  |  ALERTAS DE INVENTARIO Y STOCK CRÍTICO');
+                $sheet->setCellValue('A1', 'ALMA LECTORA  |  ALERTAS DE STOCK');
                 $sheet->getRowDimension(1)->setRowHeight(36);
 
                 $sheet->getStyle('A1')->applyFromArray([
@@ -94,7 +94,7 @@ class CriticalStockSheet implements
                 // 2. Subtítulo
                 $sheet->mergeCells('A2:G2');
                 $now = now()->format('d/m/Y H:i:s');
-                $sheet->setCellValue('A2', "Reporte generado el {$now} | Títulos con stock menor o igual a 3 unidades que requieren reposición prioritaria");
+                $sheet->setCellValue('A2', "Reporte generado el {$now} | Libros con 3 o menos unidades o agotados");
                 $sheet->getRowDimension(2)->setRowHeight(20);
 
                 $sheet->getStyle('A2')->applyFromArray([
@@ -152,7 +152,7 @@ class CriticalStockSheet implements
                     $totRow = $highestRow + 1;
                     $sheet->getRowDimension($totRow)->setRowHeight(25);
                     $sheet->mergeCells("A{$totRow}:E{$totRow}");
-                    $sheet->setCellValue("A{$totRow}", 'TOTAL DE LIBROS EN RIESGO DE STOCK');
+                    $sheet->setCellValue("A{$totRow}", 'TOTAL LIBROS CON POCO STOCK O AGOTADOS');
                     $sheet->setCellValue("F{$totRow}", "=SUM(F6:F{$highestRow})");
                     $sheet->setCellValue("G{$totRow}", '="Total: " & COUNTA(C6:C' . $highestRow . ') & " títulos"');
 

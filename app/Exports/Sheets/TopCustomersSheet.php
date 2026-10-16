@@ -30,7 +30,7 @@ class TopCustomersSheet implements
 
     public function title(): string
     {
-        return 'Top Clientes VIP';
+        return 'Top Clientes';
     }
 
     public function startCell(): string
@@ -42,14 +42,14 @@ class TopCustomersSheet implements
     {
         return [
             'Posición',
-            'Nombre del Cliente',
-            'Correo Electrónico',
-            'DNI / CUIT',
-            'Teléfono de Contacto',
-            'Tipo de Cuenta',
-            'Pedidos Confirmados',
-            'Total Facturado ($)',
-            'Última Actividad',
+            'Cliente',
+            'Email',
+            'DNI',
+            'Teléfono',
+            'Tipo de cuenta',
+            'Compras',
+            'Total gastado ($)',
+            'Última compra',
         ];
     }
 
@@ -96,7 +96,7 @@ class TopCustomersSheet implements
                 // 2. Subtítulo
                 $sheet->mergeCells('A2:I2');
                 $now = now()->format('d/m/Y H:i:s');
-                $sheet->setCellValue('A2', "Reporte generado el {$now} | Clientes con mayor recurrencia y facturación acumulada");
+                $sheet->setCellValue('A2', "Reporte generado el {$now} | Clientes que más compran");
                 $sheet->getRowDimension(2)->setRowHeight(20);
 
                 $sheet->getStyle('A2')->applyFromArray([
