@@ -19,7 +19,7 @@ export function buildWhatsAppUrl(
     const cleanPhone = whatsappPhone.replace(/\D/g, '');
 
     const lines: string[] = [
-        '🛍️ *Nueva orden de compra — Alma Lectora*',
+        '📚 *Nueva orden de compra - Alma Lectora*',
         '',
         '👤 *Datos del Cliente*',
         `Nombre: ${details.customerName}`,
@@ -27,15 +27,15 @@ export function buildWhatsAppUrl(
         `Teléfono: ${details.customerPhone}`,
         `Email: ${details.customerEmail}`,
         '',
-        '📦 *Entrega/Envío*',
+        '📦 *Entrega y Envío*',
         `Código Postal: ${details.postalCode ? details.postalCode : 'A coordinar'}`,
         `Dirección: ${details.address ? details.address : 'A coordinar'}`,
         '',
-        '🛍️ *Detalle del Pedido*',
+        '📋 *Detalle del Pedido*',
         ...items.map((item) => {
             const itemSubtotal = getItemSubtotal(item);
             const authorPart = item.author ? ` (${item.author})` : '';
-            return `• ${item.title}${authorPart} x${item.quantity} — ${formatPrice(itemSubtotal)}`;
+            return `• ${item.title}${authorPart} x${item.quantity} - ${formatPrice(itemSubtotal)}`;
         }),
         '',
         `💰 *Total de la Compra: ${formatPrice(totalAmount)}*`,
@@ -43,6 +43,10 @@ export function buildWhatsAppUrl(
         '*Por favor, confirmame los datos para coordinar el pago y el envío.*',
     ];
 
-    const encodedText = encodeURIComponent(lines.join('\n'));
-    return `https://wa.me/${cleanPhone}?text=${encodedText}`;
+    // Limpiamos selectores de variación invisibles (\uFE0F) que rompen la codificación en WhatsApp Web/Desktop
+    const rawMessage = lines.join('\n').replace(/\uFE0F/g, '');
+    const encodedText = encodeURIComponent(rawMessage);
+
+    // Usamos api.whatsapp.com directamente para evitar la redirección intermedia de wa.me que corrompe caracteres multibyte
+    return `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodedText}`;
 }
