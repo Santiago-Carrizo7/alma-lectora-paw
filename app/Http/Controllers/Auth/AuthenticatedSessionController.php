@@ -21,6 +21,7 @@ class AuthenticatedSessionController extends Controller
         return Inertia::render('auth/login', [
             'canResetPassword' => Route::has('password.request'),
             'status' => $request->session()->get('status'),
+            'initialTab' => $request->input('tab', 'login'),
         ]);
     }
 
@@ -35,6 +36,10 @@ class AuthenticatedSessionController extends Controller
 
         if ($request->user()?->isAdmin()) {
             return redirect()->intended(route('admin.dashboard', absolute: false));
+        }
+
+        if ($request->user()?->hasRole('client')) {
+            return redirect()->intended(route('customer.orders.index', absolute: false));
         }
 
         return redirect()->intended(route('dashboard', absolute: false));
