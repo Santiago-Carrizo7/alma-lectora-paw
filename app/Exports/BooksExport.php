@@ -9,17 +9,21 @@ use Maatwebsite\Excel\Concerns\FromQuery;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithColumnFormatting;
 use Maatwebsite\Excel\Concerns\WithCustomStartCell;
+use Maatwebsite\Excel\Concerns\WithCustomValueBinder;
 use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
 use Maatwebsite\Excel\Concerns\WithTitle;
 use Maatwebsite\Excel\Events\AfterSheet;
+use PhpOffice\PhpSpreadsheet\Cell\Cell;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
+use PhpOffice\PhpSpreadsheet\Cell\DefaultValueBinder;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 
-class BooksExport implements
+class BooksExport extends DefaultValueBinder implements
     FromQuery,
     WithHeadings,
     WithMapping,
@@ -27,7 +31,8 @@ class BooksExport implements
     WithCustomStartCell,
     WithColumnFormatting,
     WithEvents,
-    WithTitle
+    WithTitle,
+    WithCustomValueBinder
 {
     use Exportable;
 
@@ -36,6 +41,16 @@ class BooksExport implements
     public function __construct(array $filters = [])
     {
         $this->filters = $filters;
+    }
+
+    public function bindValue(Cell $cell, mixed $value): bool
+    {
+        if ($cell->getColumn() === 'A') {
+            $cell->setValueExplicit((string) $value, DataType::TYPE_STRING);
+            return true;
+        }
+
+        return parent::bindValue($cell, $value);
     }
 
     public function query(): Builder
@@ -233,15 +248,19 @@ class BooksExport implements
                         }
                     }
 
-                    // 6. Fila de Totales y Fórmulas Vivas de Excel
-                    $summaryRow = $highestRow + 1;
+                    // 6. Fila separadora y Fila de Totales con Subtotales Dinámicos
+                    // Insertamos una fila en blanco para aislar el rango del AutoFilter y evitar errores al ordenar
+                    $blankRow = $highestRow + 1;
+                    $sheet->getRowDimension($blankRow)->setRowHeight(12);
+
+                    $summaryRow = $highestRow + 2;
                     $sheet->getRowDimension($summaryRow)->setRowHeight(26);
 
-                    $sheet->mergeCells("A{$summaryRow}:D{$summaryRow}");
+                    // Sin mergeCells para no romper el motor de ordenamiento ni cálculos de Excel
                     $sheet->setCellValue("A{$summaryRow}", 'TOTALES Y PROMEDIOS');
-                    $sheet->setCellValue("E{$summaryRow}", "=AVERAGE(E6:E{$highestRow})");
-                    $sheet->setCellValue("F{$summaryRow}", "=SUM(F6:F{$highestRow})");
-                    $sheet->setCellValue("G{$summaryRow}", '="Total: " & COUNTA(B6:B' . $highestRow . ') & " títulos"');
+                    $sheet->setCellValue("E{$summaryRow}", "=SUBTOTAL(101, E6:E{$highestRow})");
+                    $sheet->setCellValue("F{$summaryRow}", "=SUBTOTAL(109, F6:F{$highestRow})");
+                    $sheet->setCellValue("G{$summaryRow}", '="Total: " & SUBTOTAL(103, B6:B' . $highestRow . ') & " títulos"');
                     $sheet->setCellValue("H{$summaryRow}", '');
 
                     $sheet->getStyle("E{$summaryRow}")->getNumberFormat()->setFormatCode('"$"#,##0.00');
@@ -277,7 +296,7 @@ class BooksExport implements
                         ],
                     ]);
 
-                    $sheet->getStyle("A{$summaryRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+                    $sheet->getStyle("A{$summaryRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
                     $sheet->getStyle("E{$summaryRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
                     $sheet->getStyle("F{$summaryRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
                     $sheet->getStyle("G{$summaryRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);

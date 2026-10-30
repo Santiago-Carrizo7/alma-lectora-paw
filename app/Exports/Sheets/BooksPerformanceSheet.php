@@ -5,21 +5,26 @@ namespace App\Exports\Sheets;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithCustomStartCell;
+use Maatwebsite\Excel\Concerns\WithCustomValueBinder;
 use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithTitle;
 use Maatwebsite\Excel\Events\AfterSheet;
+use PhpOffice\PhpSpreadsheet\Cell\Cell;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
+use PhpOffice\PhpSpreadsheet\Cell\DefaultValueBinder;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 
-class BooksPerformanceSheet implements
+class BooksPerformanceSheet extends DefaultValueBinder implements
     FromArray,
     WithHeadings,
     WithTitle,
     ShouldAutoSize,
     WithCustomStartCell,
-    WithEvents
+    WithEvents,
+    WithCustomValueBinder
 {
     protected array $bestSelling;
     protected array $leastSelling;
@@ -30,6 +35,16 @@ class BooksPerformanceSheet implements
         $this->bestSelling = $bestSelling;
         $this->leastSelling = $leastSelling;
         $this->noSales = $noSales;
+    }
+
+    public function bindValue(Cell $cell, mixed $value): bool
+    {
+        if ($cell->getColumn() === 'B') {
+            $cell->setValueExplicit((string) $value, DataType::TYPE_STRING);
+            return true;
+        }
+
+        return parent::bindValue($cell, $value);
     }
 
     public function title(): string
@@ -203,15 +218,20 @@ class BooksPerformanceSheet implements
                         }
                     }
 
-                    // Fila de Totales con Fórmulas de Excel
-                    $totRow = $highestRow + 1;
+                    // Fila separadora y Fila de Totales con Subtotales Dinámicos
+                    // Insertamos fila en blanco para aislar el rango del AutoFilter y evitar errores al ordenar
+                    $blankRow = $highestRow + 1;
+                    $sheet->getRowDimension($blankRow)->setRowHeight(12);
+
+                    $totRow = $highestRow + 2;
                     $sheet->getRowDimension($totRow)->setRowHeight(25);
-                    $sheet->mergeCells("A{$totRow}:E{$totRow}");
+
+                    // Sin mergeCells para no romper el motor de ordenamiento ni cálculos de Excel
                     $sheet->setCellValue("A{$totRow}", 'TOTALES Y PROMEDIOS');
-                    $sheet->setCellValue("F{$totRow}", "=AVERAGE(F6:F{$highestRow})");
-                    $sheet->setCellValue("G{$totRow}", "=SUM(G6:G{$highestRow})");
-                    $sheet->setCellValue("H{$totRow}", "=SUM(H6:H{$highestRow})");
-                    $sheet->setCellValue("I{$totRow}", "=SUM(I6:I{$highestRow})");
+                    $sheet->setCellValue("F{$totRow}", "=SUBTOTAL(101, F6:F{$highestRow})");
+                    $sheet->setCellValue("G{$totRow}", "=SUBTOTAL(109, G6:G{$highestRow})");
+                    $sheet->setCellValue("H{$totRow}", "=SUBTOTAL(109, H6:H{$highestRow})");
+                    $sheet->setCellValue("I{$totRow}", "=SUBTOTAL(109, I6:I{$highestRow})");
                     $sheet->setCellValue("J{$totRow}", '');
 
                     $sheet->getStyle("F{$totRow}")->getNumberFormat()->setFormatCode('"$"#,##0.00');
@@ -230,7 +250,7 @@ class BooksPerformanceSheet implements
                         'alignment' => ['vertical' => Alignment::VERTICAL_CENTER],
                     ]);
 
-                    $sheet->getStyle("A{$totRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+                    $sheet->getStyle("A{$totRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
                     $sheet->getStyle("F{$totRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
                     $sheet->getStyle("G{$totRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
                     $sheet->getStyle("H{$totRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);

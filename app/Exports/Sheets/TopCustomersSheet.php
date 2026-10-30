@@ -5,27 +5,42 @@ namespace App\Exports\Sheets;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithCustomStartCell;
+use Maatwebsite\Excel\Concerns\WithCustomValueBinder;
 use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithTitle;
 use Maatwebsite\Excel\Events\AfterSheet;
+use PhpOffice\PhpSpreadsheet\Cell\Cell;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
+use PhpOffice\PhpSpreadsheet\Cell\DefaultValueBinder;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 
-class TopCustomersSheet implements
+class TopCustomersSheet extends DefaultValueBinder implements
     FromArray,
     WithHeadings,
     WithTitle,
     ShouldAutoSize,
     WithCustomStartCell,
-    WithEvents
+    WithEvents,
+    WithCustomValueBinder
 {
     protected array $customers;
 
     public function __construct(array $customers)
     {
         $this->customers = $customers;
+    }
+
+    public function bindValue(Cell $cell, mixed $value): bool
+    {
+        if (in_array($cell->getColumn(), ['D', 'E'], true)) {
+            $cell->setValueExplicit((string) $value, DataType::TYPE_STRING);
+            return true;
+        }
+
+        return parent::bindValue($cell, $value);
     }
 
     public function title(): string
@@ -147,14 +162,19 @@ class TopCustomersSheet implements
                         $sheet->getStyle("H{$r}")->getNumberFormat()->setFormatCode('"$"#,##0.00');
                     }
 
-                    // Fila de Totales con Fórmulas
-                    $totRow = $highestRow + 1;
+                    // Fila separadora y Fila de Totales con Subtotales Dinámicos
+                    // Insertamos fila en blanco para aislar el rango del AutoFilter y evitar errores al ordenar
+                    $blankRow = $highestRow + 1;
+                    $sheet->getRowDimension($blankRow)->setRowHeight(12);
+
+                    $totRow = $highestRow + 2;
                     $sheet->getRowDimension($totRow)->setRowHeight(25);
-                    $sheet->mergeCells("A{$totRow}:F{$totRow}");
+
+                    // Sin mergeCells para no romper el motor de ordenamiento ni cálculos de Excel
                     $sheet->setCellValue("A{$totRow}", 'TOTALES TOP COMPRADORES');
-                    $sheet->setCellValue("G{$totRow}", "=SUM(G6:G{$highestRow})");
-                    $sheet->setCellValue("H{$totRow}", "=SUM(H6:H{$highestRow})");
-                    $sheet->setCellValue("I{$totRow}", "=AVERAGE(H6:H{$highestRow})");
+                    $sheet->setCellValue("G{$totRow}", "=SUBTOTAL(109, G6:G{$highestRow})");
+                    $sheet->setCellValue("H{$totRow}", "=SUBTOTAL(109, H6:H{$highestRow})");
+                    $sheet->setCellValue("I{$totRow}", "=SUBTOTAL(101, H6:H{$highestRow})");
 
                     $sheet->getStyle("G{$totRow}")->getNumberFormat()->setFormatCode('#,##0');
                     $sheet->getStyle("H{$totRow}")->getNumberFormat()->setFormatCode('"$"#,##0.00');
@@ -171,7 +191,7 @@ class TopCustomersSheet implements
                         'alignment' => ['vertical' => Alignment::VERTICAL_CENTER],
                     ]);
 
-                    $sheet->getStyle("A{$totRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+                    $sheet->getStyle("A{$totRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
                     $sheet->getStyle("G{$totRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
                     $sheet->getStyle("H{$totRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
                     $sheet->getStyle("I{$totRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
