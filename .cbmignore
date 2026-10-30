@@ -1,0 +1,8 @@
+﻿# Vistas compiladas de Blade y logs de Laravel
+storage/framework/
+storage/logs/
+
+# Volcados de contexto y datos de seed, no son codigo
+repomix*.xml
+repomix.config.json
+database/seeders/backup_data.json
