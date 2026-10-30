@@ -78,7 +78,10 @@ export interface Accessory {
     promo_price?: string | number | null;
     promoPrice?: string | number | null;
     stock: number;
-    category: string;
+    category_id?: string;
+    category?: string | AccessoryCategory;
+    category_label?: string;
+    category_slug?: string;
     cover_url?: string | null;
     coverUrl?: string | null;
     additional_images?: string[];

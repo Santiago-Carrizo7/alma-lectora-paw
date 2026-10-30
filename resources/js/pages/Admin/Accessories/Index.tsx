@@ -13,7 +13,10 @@ interface AccessoryItem {
     promo_quantity: number | null;
     promo_price: number | string | null;
     stock: number;
-    category: string;
+    category_id?: string;
+    category?: string | CategoryItem;
+    category_label?: string;
+    category_slug?: string;
     cover_url: string | null;
     is_active: boolean;
 }
@@ -343,7 +346,9 @@ export function Index({ accessories, filters, counts, categories }: IndexProps) 
                                                 {/* Category */}
                                                 <td className="px-3 py-3 whitespace-nowrap">
                                                     <span className="bg-paper-dark text-ink-muted rounded-md px-2 py-0.5 text-[11px] font-semibold">
-                                                        {acc.category}
+                                                        {typeof acc.category === 'object'
+                                                            ? acc.category?.label
+                                                            : (acc.category_label || acc.category)}
                                                     </span>
                                                 </td>
 
@@ -516,7 +521,7 @@ export function Index({ accessories, filters, counts, categories }: IndexProps) 
                     setSelectedForStock(null);
                 }}
                 title={selectedForStock?.title}
-                subtitle={`Categoría: ${selectedForStock?.category}`}
+                subtitle={`Categoría: ${typeof selectedForStock?.category === 'object' ? selectedForStock.category?.label : (selectedForStock?.category_label || selectedForStock?.category || '-')}`}
                 initialStock={selectedForStock?.stock ?? 0}
                 onSave={handleSaveStock}
                 isPending={isProcessing}

@@ -78,7 +78,11 @@ export function AccessoryDetailPage({ accessory, relatedAccessories = [] }: Acce
                             <h1 className="text-2xl sm:text-3xl font-bold font-serif text-ink tracking-tight leading-tight">
                                 {accessory.title}
                             </h1>
-                            <p className="text-xs uppercase font-bold text-forest mt-1.5">{accessory.category}</p>
+                            <p className="text-xs uppercase font-bold text-forest mt-1.5">
+                                {typeof accessory.category === 'object'
+                                    ? accessory.category?.label
+                                    : (accessory.category_label || accessory.category)}
+                            </p>
 
                             {promoQty && promoPrc && (
                                 <div className="mt-3 bg-amber-50 border border-amber-200 text-amber-900 rounded-lg p-2.5 flex items-center gap-2 text-xs font-semibold">

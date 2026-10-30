@@ -79,7 +79,9 @@ export const AccessoryCard = React.memo(function AccessoryCard({ accessory, onAd
                             </span>
                         )}
                         <span className="bg-paper-dark/95 text-ink border-paper-dark rounded border px-2 py-0.5 text-[9px] font-bold tracking-wider uppercase shadow-xs">
-                            {accessory.category}
+                            {typeof accessory.category === 'object'
+                                ? accessory.category?.label
+                                : (accessory.category_label || accessory.category)}
                         </span>
                     </div>
                 </div>

@@ -30,4 +30,9 @@ class AccessoryCategory extends Model
     {
         return $query->where('is_active', true);
     }
+
+    public function accessories(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Accessory::class, 'category_id');
+    }
 }

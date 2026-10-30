@@ -41,6 +41,7 @@ class AdminAccessoryController extends Controller
             : Accessory::withoutTrashed();
 
         $accessories = $query
+            ->with('category')
             ->filter($request->only(['search', 'category']))
             ->latest()
             ->paginate(10)
@@ -89,11 +90,26 @@ class AdminAccessoryController extends Controller
             'promo_quantity' => 'nullable|integer|min:1',
             'promo_price' => 'nullable|numeric|min:0',
             'stock' => 'required|integer|min:0',
-            'category' => 'required|string|max:100',
+            'category_id' => 'nullable|uuid|exists:accessory_categories,id',
+            'category' => 'nullable|string|max:100',
             'cover_url' => 'nullable|string|max:1000',
             'additional_images' => 'nullable|array',
             'is_active' => 'boolean',
         ]);
+
+        if (empty($validated['category_id']) && !empty($validated['category'])) {
+            $catVal = $validated['category'];
+            $validated['category_id'] = AccessoryCategory::where('id', $catVal)
+                ->orWhere('slug', $catVal)
+                ->orWhereRaw('LOWER(label) = ?', [mb_strtolower($catVal)])
+                ->value('id');
+        }
+
+        if (empty($validated['category_id'])) {
+            $validated['category_id'] = AccessoryCategory::orderBy('order')->value('id');
+        }
+
+        unset($validated['category']);
 
         Accessory::create($validated);
 
@@ -105,6 +121,7 @@ class AdminAccessoryController extends Controller
      */
     public function edit(Accessory $accessory): Response
     {
+        $accessory->load('category');
         $categories = AccessoryCategory::active()->orderBy('order')->get(['id', 'slug', 'label', 'emoji']);
 
         return Inertia::render('Admin/Accessories/Form', [
@@ -125,11 +142,26 @@ class AdminAccessoryController extends Controller
             'promo_quantity' => 'nullable|integer|min:1',
             'promo_price' => 'nullable|numeric|min:0',
             'stock' => 'required|integer|min:0',
-            'category' => 'required|string|max:100',
+            'category_id' => 'nullable|uuid|exists:accessory_categories,id',
+            'category' => 'nullable|string|max:100',
             'cover_url' => 'nullable|string|max:1000',
             'additional_images' => 'nullable|array',
             'is_active' => 'boolean',
         ]);
+
+        if (empty($validated['category_id']) && !empty($validated['category'])) {
+            $catVal = $validated['category'];
+            $validated['category_id'] = AccessoryCategory::where('id', $catVal)
+                ->orWhere('slug', $catVal)
+                ->orWhereRaw('LOWER(label) = ?', [mb_strtolower($catVal)])
+                ->value('id');
+        }
+
+        if (empty($validated['category_id'])) {
+            $validated['category_id'] = AccessoryCategory::orderBy('order')->value('id');
+        }
+
+        unset($validated['category']);
 
         $accessory->update($validated);
 

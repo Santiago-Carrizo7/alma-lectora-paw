@@ -46,6 +46,15 @@ class AccessorySeeder extends Seeder
                     default => 15,// Abundante
                 };
 
+                $catSlug = $acc['category'] ?? null;
+                $catId = AccessoryCategory::where('slug', $catSlug)
+                    ->orWhere('id', $catSlug)
+                    ->value('id');
+
+                if (!$catId) {
+                    $catId = AccessoryCategory::first()?->id;
+                }
+
                 Accessory::updateOrCreate(
                     ['id' => $acc['id']],
                     [
@@ -55,7 +64,7 @@ class AccessorySeeder extends Seeder
                         'promo_quantity' => $acc['promoQuantity'] ?? null,
                         'promo_price' => $acc['promoPrice'] ?? null,
                         'stock' => $variedStock,
-                        'category' => $acc['category'],
+                        'category_id' => $catId,
                         'cover_url' => $acc['coverUrl'] ?? null,
                         'additional_images' => $acc['additionalImages'] ?? [],
                         'is_active' => $acc['isActive'] ?? true,
@@ -204,6 +213,11 @@ class AccessorySeeder extends Seeder
         ];
 
         foreach ($accessories as $data) {
+            $catSlug = $data['category'] ?? null;
+            $catId = AccessoryCategory::where('slug', $catSlug)->value('id') ?? AccessoryCategory::first()?->id;
+            $data['category_id'] = $catId;
+            unset($data['category']);
+
             Accessory::firstOrCreate(
                 ['title' => $data['title']],
                 $data

@@ -179,7 +179,9 @@ export function ComboDetailPage({ combo }: ComboDetailPageProps) {
                                                     </p>
                                                     {a.accessory?.category && (
                                                         <p className="text-ink-muted truncate text-[11px]">
-                                                            {a.accessory.category}
+                                                            {typeof a.accessory.category === 'object'
+                                                                ? a.accessory.category?.label
+                                                                : (a.accessory.category_label || a.accessory.category)}
                                                         </p>
                                                     )}
                                                 </div>

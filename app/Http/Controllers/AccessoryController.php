@@ -21,8 +21,8 @@ class AccessoryController extends Controller
         $isFiltered = ! empty($filters['search']) || ! empty($filters['category']);
 
         $accessories = $isFiltered
-            ? Accessory::active()->filter($filters)->latest()->paginate(16)->withQueryString()
-            : Accessory::active()->filter($filters)->latest()->paginate(100)->withQueryString();
+            ? Accessory::active()->with('category')->filter($filters)->latest()->paginate(16)->withQueryString()
+            : Accessory::active()->with('category')->filter($filters)->latest()->paginate(100)->withQueryString();
 
         return Inertia::render('Catalog/AccessoriesPage', [
             'accessories' => $accessories,
@@ -35,6 +35,7 @@ class AccessoryController extends Controller
     {
         abort_if(! $accessory->is_active && ! auth()->user()?->isAdmin(), 404);
 
+        $accessory->load('category');
         $relatedAccessories = $accessory->getRelated(4);
 
         return Inertia::render('Catalog/AccessoryDetailPage', [

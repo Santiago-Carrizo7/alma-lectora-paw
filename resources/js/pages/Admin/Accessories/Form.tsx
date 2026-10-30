@@ -17,7 +17,8 @@ interface AccessoryItem {
     promo_quantity: number | null;
     promo_price: number | string | null;
     stock: number;
-    category: string;
+    category_id?: string;
+    category?: string | CategoryItem;
     cover_url: string | null;
     is_active: boolean;
 }
@@ -30,9 +31,17 @@ interface FormProps {
 export function Form({ accessory, categories }: FormProps) {
     const isEditing = Boolean(accessory);
 
+    const initialCatId =
+        accessory?.category_id ||
+        (typeof accessory?.category === 'object' ? accessory?.category?.id : null) ||
+        categories.find((c) => c.slug === accessory?.category || c.id === accessory?.category)?.id ||
+        categories[0]?.id ||
+        '';
+
     const form = useForm({
         title: accessory?.title || '',
-        category: accessory?.category || (categories[0]?.slug ?? 'SEPARADORES'),
+        category_id: initialCatId,
+        category: initialCatId,
         price: accessory?.price !== undefined ? String(accessory.price) : '',
         promo_quantity: accessory?.promo_quantity ? String(accessory.promo_quantity) : '',
         promo_price: accessory?.promo_price ? String(accessory.promo_price) : '',
@@ -95,14 +104,17 @@ export function Form({ accessory, categories }: FormProps) {
                                 Categoría <span className="text-red-600">*</span>
                             </label>
                             <select
-                                value={form.data.category}
-                                onChange={(e) => form.setData('category', e.target.value)}
+                                value={form.data.category_id || form.data.category}
+                                onChange={(e) => {
+                                    form.setData('category_id', e.target.value);
+                                    form.setData('category', e.target.value);
+                                }}
                                 className="bg-paper focus:ring-forest/40 focus:border-forest text-ink w-full rounded-xl border border-stone-300 px-3.5 py-2.5 text-xs focus:ring-2"
                                 required
                             >
                                 {categories.map((cat) => (
-                                    <option key={cat.id} value={cat.slug}>
-                                        {cat.emoji ? `${cat.emoji} ${cat.label}` : cat.label}
+                                    <option key={cat.id} value={cat.id}>
+                                        {cat.emoji ? `${cat.emoji} ` : ''}{cat.label}
                                     </option>
                                 ))}
                             </select>

@@ -50,11 +50,16 @@ export function AccessoriesPage({ accessories, categories = [], filters = {} }: 
     const isDefaultView = !filters.category && (!filters.search || !filters.search.trim());
 
     const accessoriesByCategory = categories.reduce((acc, cat) => {
-        const catItems = items.filter(
-            (a) =>
-                a.category.toLowerCase() === cat.slug.toLowerCase() ||
-                a.category.toLowerCase() === cat.label.toLowerCase()
-        );
+        const catItems = items.filter((a) => {
+            if (a.category_id && a.category_id === cat.id) return true;
+            const catVal = typeof a.category === 'object'
+                ? (a.category?.slug || a.category?.label)
+                : (a.category_slug || a.category);
+            return (
+                catVal?.toLowerCase() === cat.slug.toLowerCase() ||
+                catVal?.toLowerCase() === cat.label.toLowerCase()
+            );
+        });
         if (catItems.length > 0) {
             acc.push({
                 cat,

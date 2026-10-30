@@ -21,6 +21,7 @@ class Accessory extends Model
         'promo_quantity',
         'promo_price',
         'stock',
+        'category_id',
         'category',
         'cover_url',
         'additional_images',
@@ -35,6 +36,53 @@ class Accessory extends Model
         'additional_images' => 'array',
         'is_active' => 'boolean',
     ];
+
+    protected $appends = [
+        'category_label',
+        'category_slug',
+    ];
+
+    public function category(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(AccessoryCategory::class, 'category_id');
+    }
+
+    public function getCategoryLabelAttribute(): ?string
+    {
+        return $this->category?->label;
+    }
+
+    public function getCategorySlugAttribute(): ?string
+    {
+        return $this->category?->slug;
+    }
+
+    public function setCategoryAttribute($value): void
+    {
+        if (empty($value)) {
+            return;
+        }
+
+        if (\Illuminate\Support\Str::isUuid($value)) {
+            $this->attributes['category_id'] = $value;
+            return;
+        }
+
+        $catId = AccessoryCategory::where('slug', $value)
+            ->orWhere('id', $value)
+            ->orWhereRaw('LOWER(label) = ?', [mb_strtolower($value)])
+            ->value('id');
+
+        if (! $catId) {
+            $cat = AccessoryCategory::firstOrCreate(
+                ['slug' => \Illuminate\Support\Str::slug($value)],
+                ['label' => ucfirst($value), 'order' => 99]
+            );
+            $catId = $cat->id;
+        }
+
+        $this->attributes['category_id'] = $catId;
+    }
 
     public function scopeActive(Builder $query): Builder
     {
@@ -53,7 +101,16 @@ class Accessory extends Model
                 });
             })
             ->when($filters['category'] ?? null, function (Builder $q, string $category) {
-                $q->where('category', $category);
+                $q->where(function (Builder $sub) use ($category) {
+                    if (\Illuminate\Support\Str::isUuid($category)) {
+                        $sub->where('category_id', $category);
+                    } else {
+                        $sub->whereHas('category', function (Builder $catQ) use ($category) {
+                            $catQ->whereRaw('LOWER(slug) = ?', [mb_strtolower($category)])
+                                ->orWhereRaw('LOWER(label) = ?', [mb_strtolower($category)]);
+                        });
+                    }
+                });
             });
     }
 
@@ -112,10 +169,10 @@ class Accessory extends Model
             $score += 3;
         }
 
-        if ($this->category === $other->category) {
+        if ($this->category_id === $other->category_id) {
             if ($score > 0) {
                 $score += 2;
-            } elseif ($this->category === 'SEPARADORES') {
+            } elseif (($this->category?->slug ?? $this->category_slug) === 'SEPARADORES') {
                 $score += 2;
             }
         }

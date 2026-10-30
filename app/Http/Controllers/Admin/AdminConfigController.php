@@ -97,6 +97,10 @@ class AdminConfigController extends Controller
      */
     public function destroyCategory(AccessoryCategory $category): RedirectResponse
     {
+        if ($category->accessories()->exists()) {
+            return back()->with('error', 'No se puede eliminar la categoría porque tiene accesorios asociados.');
+        }
+
         $category->delete();
 
         return back()->with('success', 'Categoría eliminada.');
