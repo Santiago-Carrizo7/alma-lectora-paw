@@ -110,6 +110,15 @@
             margin-bottom: 14px;
             font-size: 10px;
         }
+        .data-table thead {
+            display: table-header-group;
+        }
+        .data-table tr {
+            page-break-inside: avoid;
+        }
+        .section-header {
+            page-break-after: avoid;
+        }
         .data-table th {
             background-color: #2c4a3e;
             color: #ffffff;
@@ -186,7 +195,9 @@
             <td style="width: 45%; vertical-align: top;">
                 <div class="doc-title">INFORME DE RENDIMIENTO DE NEGOCIO</div>
                 <div class="doc-meta">
-                    <strong>Emitido:</strong> {{ $data['generated_at'] }}
+                    <strong>Período:</strong> {{ $data['period_label'] ?? 'Histórico completo' }}<br>
+                    <strong>Emitido:</strong> {{ $data['generated_at'] }}<br>
+                    <strong>Generado por:</strong> {{ $data['generated_by'] ?? 'Sistema' }}
                 </div>
             </td>
         </tr>
@@ -196,24 +207,29 @@
     <table class="kpi-table">
         <tr>
             <td class="kpi-card highlight">
-                <div class="kpi-label">Ventas Facturadas</div>
+                <div class="kpi-label">Ventas Confirmadas</div>
                 <div class="kpi-value">${{ number_format($data['kpis']['total_revenue'], 2, ',', '.') }}</div>
-                <div class="kpi-sub">Pedidos Confirmados</div>
+                <div class="kpi-sub">{{ $data['kpis']['confirmed_orders'] }} pedidos confirmados</div>
             </td>
             <td class="kpi-card">
-                <div class="kpi-label">Efectividad WhatsApp</div>
+                <div class="kpi-label">Tasa de Confirmación</div>
                 <div class="kpi-value">{{ $data['kpis']['conversion_rate'] }}%</div>
-                <div class="kpi-sub">{{ $data['kpis']['confirmed_orders'] }} de {{ $data['kpis']['total_orders'] }} órdenes</div>
+                <div class="kpi-sub">{{ $data['kpis']['confirmed_orders'] }} de {{ $data['kpis']['total_orders'] }} pedidos</div>
             </td>
             <td class="kpi-card">
                 <div class="kpi-label">Ticket Promedio</div>
                 <div class="kpi-value">${{ number_format($data['kpis']['average_ticket'], 2, ',', '.') }}</div>
-                <div class="kpi-sub">Por orden confirmada</div>
+                <div class="kpi-sub">Por pedido confirmado</div>
             </td>
             <td class="kpi-card">
-                <div class="kpi-label">Unidades Vendidas</div>
+                <div class="kpi-label">Libros Vendidos</div>
                 <div class="kpi-value">{{ $data['kpis']['units_sold'] }}</div>
-                <div class="kpi-sub">Libros entregados</div>
+                <div class="kpi-sub">
+                    En pedidos confirmados
+                    @if(($data['kpis']['accessory_units_sold'] ?? 0) > 0 || ($data['kpis']['combo_units_sold'] ?? 0) > 0)
+                        (+{{ $data['kpis']['accessory_units_sold'] ?? 0 }} acc., +{{ $data['kpis']['combo_units_sold'] ?? 0 }} combos)
+                    @endif
+                </div>
             </td>
         </tr>
     </table>
@@ -228,7 +244,7 @@
                 <th style="width: 25%;">Email / Contacto</th>
                 <th style="width: 15%;" class="text-center">DNI</th>
                 <th style="width: 15%;" class="text-center">Cuenta</th>
-                <th style="width: 15%;" class="text-right">Total Facturado</th>
+                <th style="width: 15%;" class="text-right">Total Confirmado</th>
             </tr>
         </thead>
         <tbody>
@@ -303,7 +319,7 @@
             </tr>
         </thead>
         <tbody>
-            @forelse(array_slice($data['critical_stock'], 0, 8) as $stock)
+            @forelse($data['critical_stock'] as $stock)
                 <tr>
                     <td>{{ $stock['isbn'] }}</td>
                     <td>{{ $stock['title'] }}</td>

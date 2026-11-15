@@ -2,6 +2,7 @@
 
 namespace App\Exports;
 
+use App\Exports\Concerns\FormulaSafeValueBinder;
 use App\Models\Book;
 use Illuminate\Database\Eloquent\Builder;
 use Maatwebsite\Excel\Concerns\Exportable;
@@ -15,7 +16,6 @@ use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
 use Maatwebsite\Excel\Concerns\WithTitle;
 use Maatwebsite\Excel\Events\AfterSheet;
-use PhpOffice\PhpSpreadsheet\Cell\Cell;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Cell\DefaultValueBinder;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
@@ -35,6 +35,7 @@ class BooksExport extends DefaultValueBinder implements
     WithCustomValueBinder
 {
     use Exportable;
+    use FormulaSafeValueBinder;
 
     protected array $filters;
 
@@ -43,29 +44,36 @@ class BooksExport extends DefaultValueBinder implements
         $this->filters = $filters;
     }
 
-    public function bindValue(Cell $cell, mixed $value): bool
-    {
-        if ($cell->getColumn() === 'A') {
-            $cell->setValueExplicit((string) $value, DataType::TYPE_STRING);
-            return true;
-        }
-
-        return parent::bindValue($cell, $value);
-    }
-
     public function query(): Builder
     {
+        $hasActiveFilters = !empty($this->filters['search'])
+            || !empty($this->filters['genre'])
+            || !empty($this->filters['stock_status'])
+            || !empty($this->filters['tab']);
+
+        if (!$hasActiveFilters) {
+            $query = Book::withTrashed()->with('authors');
+            if (!empty($this->filters['sort'])) {
+                $query->filter(['sort' => $this->filters['sort']]);
+            } else {
+                $query->latest();
+            }
+
+            return $query;
+        }
+
         $tab = $this->filters['tab'] ?? 'available';
 
         $query = $tab === 'archived'
             ? Book::onlyTrashed()->with('authors')
             : Book::withoutTrashed()->with('authors');
 
-        if (!empty($this->filters['search'])) {
-            $query->filter(['search' => $this->filters['search']]);
+        $query->filter($this->filters);
+        if (empty($this->filters['sort'])) {
+            $query->latest();
         }
 
-        return $query->latest();
+        return $query;
     }
 
     public function startCell(): string
@@ -125,9 +133,32 @@ class BooksExport extends DefaultValueBinder implements
                 $sheet = $event->sheet->getDelegate();
 
                 $highestRow = $sheet->getHighestRow();
+                $hasActiveFilters = !empty($this->filters['search'])
+                    || !empty($this->filters['genre'])
+                    || !empty($this->filters['stock_status'])
+                    || !empty($this->filters['tab']);
+
                 $tab = $this->filters['tab'] ?? 'available';
-                $tabLabel = $tab === 'archived' ? 'Libros Archivados' : 'Catálogo Activo';
+                $tabLabel = !$hasActiveFilters
+                    ? 'Reporte Global (Disponibles + Archivados)'
+                    : ($tab === 'archived' ? 'Libros Archivados' : 'Catálogo Activo');
+
                 $search = !empty($this->filters['search']) ? $this->filters['search'] : 'Todos';
+                $genre = !empty($this->filters['genre']) ? $this->filters['genre'] : 'Todos';
+                $stockLabel = match ($this->filters['stock_status'] ?? '') {
+                    'in_stock' => 'Con stock (> 0)',
+                    'low_stock' => 'Stock crítico (1 a 3)',
+                    'out_of_stock' => 'Agotados (0)',
+                    default => 'Todo',
+                };
+                $sortLabel = match ($this->filters['sort'] ?? '') {
+                    'price_asc' => 'Precio (Menor a Mayor)',
+                    'price_desc' => 'Precio (Mayor a Menor)',
+                    'stock_asc' => 'Stock (Menor a Mayor)',
+                    'stock_desc' => 'Stock (Mayor a Menor)',
+                    'title_asc' => 'Título (A-Z)',
+                    default => 'Más recientes',
+                };
                 $userName = auth()->user()?->name ?? 'Administración';
                 $generatedAt = now()->format('d/m/Y H:i:s');
 
@@ -155,7 +186,7 @@ class BooksExport extends DefaultValueBinder implements
 
                 // 2. Metadatos y Filtros (A2:H2)
                 $sheet->mergeCells('A2:H2');
-                $metaText = "Generado: {$generatedAt} | Usuario: {$userName} | Vista: {$tabLabel} | Filtro: \"{$search}\"";
+                $metaText = "Generado: {$generatedAt} | Usuario: {$userName} | Vista: {$tabLabel} | Búsqueda: \"{$search}\" | Género: {$genre} | Stock: {$stockLabel} | Orden: {$sortLabel}";
                 $sheet->setCellValue('A2', $metaText);
                 $sheet->getRowDimension(2)->setRowHeight(20);
 
@@ -257,13 +288,12 @@ class BooksExport extends DefaultValueBinder implements
                     $sheet->getRowDimension($summaryRow)->setRowHeight(26);
 
                     // Sin mergeCells para no romper el motor de ordenamiento ni cálculos de Excel
-                    $sheet->setCellValue("A{$summaryRow}", 'TOTALES Y PROMEDIOS');
-                    $sheet->setCellValue("E{$summaryRow}", "=SUBTOTAL(101, E6:E{$highestRow})");
-                    $sheet->setCellValue("F{$summaryRow}", "=SUBTOTAL(109, F6:F{$highestRow})");
-                    $sheet->setCellValue("G{$summaryRow}", '="Total: " & SUBTOTAL(103, B6:B' . $highestRow . ') & " títulos"');
-                    $sheet->setCellValue("H{$summaryRow}", '');
+                    $sheet->setCellValueExplicit("A{$summaryRow}", 'TOTAL DISPONIBLE EN INVENTARIO', DataType::TYPE_STRING);
+                    $sheet->setCellValueExplicit("E{$summaryRow}", '', DataType::TYPE_STRING);
+                    $sheet->setCellValueExplicit("F{$summaryRow}", "=SUBTOTAL(109, F6:F{$highestRow})", DataType::TYPE_FORMULA);
+                    $sheet->setCellValueExplicit("G{$summaryRow}", '="Total: " & SUBTOTAL(103, B6:B' . $highestRow . ') & " títulos"', DataType::TYPE_FORMULA);
+                    $sheet->setCellValueExplicit("H{$summaryRow}", '', DataType::TYPE_STRING);
 
-                    $sheet->getStyle("E{$summaryRow}")->getNumberFormat()->setFormatCode('"$"#,##0.00');
                     $sheet->getStyle("F{$summaryRow}")->getNumberFormat()->setFormatCode('#,##0');
 
                     $sheet->getStyle("A{$summaryRow}:H{$summaryRow}")->applyFromArray([

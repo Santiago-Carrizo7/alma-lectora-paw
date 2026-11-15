@@ -2,6 +2,7 @@
 
 namespace App\Exports;
 
+use App\Exports\Concerns\FormulaSafeValueBinder;
 use App\Models\Combo;
 use Illuminate\Database\Eloquent\Builder;
 use Maatwebsite\Excel\Concerns\Exportable;
@@ -9,16 +10,19 @@ use Maatwebsite\Excel\Concerns\FromQuery;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithColumnFormatting;
 use Maatwebsite\Excel\Concerns\WithCustomStartCell;
+use Maatwebsite\Excel\Concerns\WithCustomValueBinder;
 use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
 use Maatwebsite\Excel\Concerns\WithTitle;
 use Maatwebsite\Excel\Events\AfterSheet;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
+use PhpOffice\PhpSpreadsheet\Cell\DefaultValueBinder;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 
-class CombosExport implements
+class CombosExport extends DefaultValueBinder implements
     FromQuery,
     WithHeadings,
     WithMapping,
@@ -26,9 +30,11 @@ class CombosExport implements
     WithCustomStartCell,
     WithColumnFormatting,
     WithEvents,
-    WithTitle
+    WithTitle,
+    WithCustomValueBinder
 {
     use Exportable;
+    use FormulaSafeValueBinder;
 
     protected array $filters;
 
@@ -39,22 +45,33 @@ class CombosExport implements
 
     public function query(): Builder
     {
+        $hasActiveFilters = !empty($this->filters['search'])
+            || !empty($this->filters['stock_status'])
+            || !empty($this->filters['tab']);
+
+        if (!$hasActiveFilters) {
+            $query = Combo::withTrashed()->with(['books.book', 'accessories.accessory']);
+            if (!empty($this->filters['sort'])) {
+                $query->filter(['sort' => $this->filters['sort']]);
+            } else {
+                $query->latest();
+            }
+
+            return $query;
+        }
+
         $tab = $this->filters['tab'] ?? 'available';
 
         $query = $tab === 'archived'
             ? Combo::onlyTrashed()->with(['books.book', 'accessories.accessory'])
             : Combo::withoutTrashed()->with(['books.book', 'accessories.accessory']);
 
-        if (!empty($this->filters['search'])) {
-            $search = $this->filters['search'];
-            $like = $query->getConnection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
-            $query->where(function ($q) use ($search, $like) {
-                $q->where('title', $like, "%{$search}%")
-                  ->orWhere('description', $like, "%{$search}%");
-            });
+        $query->filter($this->filters);
+        if (empty($this->filters['sort'])) {
+            $query->latest();
         }
 
-        return $query->latest();
+        return $query;
     }
 
     public function startCell(): string
@@ -96,14 +113,14 @@ class CombosExport implements
         $status = $combo->trashed() ? 'Archivado' : ($combo->is_active ? 'Activo' : 'Inactivo');
 
         return [
-            $combo->id,
+            (string) $combo->id,
             $combo->title,
             $books ?: 'Sin libros asignados',
             $accessories ?: 'Sin accesorios asignados',
             (float) $combo->price,
             (int) $combo->stock,
             $status,
-            $combo->description ?: '-',
+            trim(strip_tags((string) ($combo->description ?: ''))) ?: '-',
         ];
     }
 
@@ -122,9 +139,30 @@ class CombosExport implements
                 $sheet = $event->sheet->getDelegate();
 
                 $highestRow = $sheet->getHighestRow();
+                $hasActiveFilters = !empty($this->filters['search'])
+                    || !empty($this->filters['stock_status'])
+                    || !empty($this->filters['tab']);
+
                 $tab = $this->filters['tab'] ?? 'available';
-                $tabLabel = $tab === 'archived' ? 'Combos Archivados' : 'Catálogo Activo';
+                $tabLabel = !$hasActiveFilters
+                    ? 'Reporte Global (Disponibles + Archivados)'
+                    : ($tab === 'archived' ? 'Combos Archivados' : 'Catálogo Activo');
+
                 $search = !empty($this->filters['search']) ? $this->filters['search'] : 'Todos';
+                $stockLabel = match ($this->filters['stock_status'] ?? '') {
+                    'in_stock' => 'Con stock (> 0)',
+                    'low_stock' => 'Stock crítico (1 a 3)',
+                    'out_of_stock' => 'Agotados (0)',
+                    default => 'Todo',
+                };
+                $sortLabel = match ($this->filters['sort'] ?? '') {
+                    'price_asc' => 'Precio (Menor a Mayor)',
+                    'price_desc' => 'Precio (Mayor a Menor)',
+                    'stock_asc' => 'Stock (Menor a Mayor)',
+                    'stock_desc' => 'Stock (Mayor a Menor)',
+                    'title_asc' => 'Título (A-Z)',
+                    default => 'Más recientes',
+                };
                 $userName = auth()->user()?->name ?? 'Administración';
                 $generatedAt = now()->format('d/m/Y H:i:s');
 
@@ -152,7 +190,7 @@ class CombosExport implements
 
                 // 2. Metadatos y Filtros (A2:H2)
                 $sheet->mergeCells('A2:H2');
-                $metaText = "Generado: {$generatedAt} | Usuario: {$userName} | Vista: {$tabLabel} | Filtro: \"{$search}\"";
+                $metaText = "Generado: {$generatedAt} | Usuario: {$userName} | Vista: {$tabLabel} | Búsqueda: \"{$search}\" | Stock: {$stockLabel} | Orden: {$sortLabel}";
                 $sheet->setCellValue('A2', $metaText);
                 $sheet->getRowDimension(2)->setRowHeight(20);
 
@@ -251,13 +289,12 @@ class CombosExport implements
                     $sheet->getRowDimension($summaryRow)->setRowHeight(26);
 
                     // Sin mergeCells para no romper ordenamientos ni filtros
-                    $sheet->setCellValue("A{$summaryRow}", 'TOTALES Y PROMEDIOS');
-                    $sheet->setCellValue("E{$summaryRow}", "=SUBTOTAL(101, E6:E{$highestRow})");
-                    $sheet->setCellValue("F{$summaryRow}", "=SUBTOTAL(109, F6:F{$highestRow})");
-                    $sheet->setCellValue("G{$summaryRow}", '="Total: " & SUBTOTAL(103, B6:B' . $highestRow . ') & " combos"');
-                    $sheet->setCellValue("H{$summaryRow}", '');
+                    $sheet->setCellValueExplicit("A{$summaryRow}", 'TOTAL DISPONIBLE EN INVENTARIO', DataType::TYPE_STRING);
+                    $sheet->setCellValueExplicit("E{$summaryRow}", '', DataType::TYPE_STRING);
+                    $sheet->setCellValueExplicit("F{$summaryRow}", "=SUBTOTAL(109, F6:F{$highestRow})", DataType::TYPE_FORMULA);
+                    $sheet->setCellValueExplicit("G{$summaryRow}", '="Total: " & SUBTOTAL(103, B6:B' . $highestRow . ') & " combos"', DataType::TYPE_FORMULA);
+                    $sheet->setCellValueExplicit("H{$summaryRow}", '', DataType::TYPE_STRING);
 
-                    $sheet->getStyle("E{$summaryRow}")->getNumberFormat()->setFormatCode('"$"#,##0.00');
                     $sheet->getStyle("F{$summaryRow}")->getNumberFormat()->setFormatCode('#,##0');
 
                     $sheet->getStyle("A{$summaryRow}:H{$summaryRow}")->applyFromArray([

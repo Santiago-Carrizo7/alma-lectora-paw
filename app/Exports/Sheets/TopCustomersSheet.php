@@ -2,6 +2,8 @@
 
 namespace App\Exports\Sheets;
 
+use App\Exports\Concerns\FormulaSafeValueBinder;
+use Illuminate\Support\Carbon;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithCustomStartCell;
@@ -10,7 +12,6 @@ use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithTitle;
 use Maatwebsite\Excel\Events\AfterSheet;
-use PhpOffice\PhpSpreadsheet\Cell\Cell;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Cell\DefaultValueBinder;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
@@ -26,21 +27,23 @@ class TopCustomersSheet extends DefaultValueBinder implements
     WithEvents,
     WithCustomValueBinder
 {
+    use FormulaSafeValueBinder;
+
     protected array $customers;
+    protected string $periodLabel;
+    protected string $generatedAt;
+    protected string $generatedBy;
 
-    public function __construct(array $customers)
-    {
+    public function __construct(
+        array $customers,
+        string $periodLabel = 'Período seleccionado',
+        string $generatedAt = '',
+        string $generatedBy = 'Sistema Administrativo'
+    ) {
         $this->customers = $customers;
-    }
-
-    public function bindValue(Cell $cell, mixed $value): bool
-    {
-        if (in_array($cell->getColumn(), ['D', 'E'], true)) {
-            $cell->setValueExplicit((string) $value, DataType::TYPE_STRING);
-            return true;
-        }
-
-        return parent::bindValue($cell, $value);
+        $this->periodLabel = $periodLabel;
+        $this->generatedAt = $generatedAt ?: now()->format('d/m/Y H:i:s');
+        $this->generatedBy = $generatedBy;
     }
 
     public function title(): string
@@ -74,16 +77,26 @@ class TopCustomersSheet extends DefaultValueBinder implements
         $i = 1;
 
         foreach ($this->customers as $c) {
+            $rawDate = $c['last_order_at'] ?? null;
+            $formattedDate = 'Sin fecha';
+            if (is_string($rawDate) && $rawDate !== '') {
+                try {
+                    $formattedDate = Carbon::parse($rawDate)->format('d/m/Y H:i');
+                } catch (\Throwable) {
+                    $formattedDate = $rawDate;
+                }
+            }
+
             $rows[] = [
                 $i++,
-                $c['name'] ?? 'Cliente anónimo',
-                $c['email'] ?? 'Sin correo',
-                $c['dni'] ?? 'S/D',
-                $c['phone'] ?? 'S/D',
+                (string) ($c['name'] ?? 'Cliente anónimo'),
+                (string) ($c['email'] ?? 'Sin correo'),
+                (string) ($c['dni'] ?? 'S/D'),
+                (string) ($c['phone'] ?? 'S/D'),
                 !empty($c['is_registered']) ? 'Cliente Registrado' : 'Comprador Invitado',
                 (int) ($c['orders_count'] ?? 0),
                 (float) ($c['total_spent'] ?? 0),
-                $c['last_order_at'] ?? 'Sin fecha',
+                $formattedDate,
             ];
         }
 
@@ -110,8 +123,7 @@ class TopCustomersSheet extends DefaultValueBinder implements
 
                 // 2. Subtítulo
                 $sheet->mergeCells('A2:I2');
-                $now = now()->format('d/m/Y H:i:s');
-                $sheet->setCellValue('A2', "Reporte generado el {$now} | Clientes que más compran");
+                $sheet->setCellValue('A2', "Período: {$this->periodLabel} | Emitido: {$this->generatedAt} | Por: {$this->generatedBy}");
                 $sheet->getRowDimension(2)->setRowHeight(20);
 
                 $sheet->getStyle('A2')->applyFromArray([
@@ -171,10 +183,10 @@ class TopCustomersSheet extends DefaultValueBinder implements
                     $sheet->getRowDimension($totRow)->setRowHeight(25);
 
                     // Sin mergeCells para no romper el motor de ordenamiento ni cálculos de Excel
-                    $sheet->setCellValue("A{$totRow}", 'TOTALES TOP COMPRADORES');
-                    $sheet->setCellValue("G{$totRow}", "=SUBTOTAL(109, G6:G{$highestRow})");
-                    $sheet->setCellValue("H{$totRow}", "=SUBTOTAL(109, H6:H{$highestRow})");
-                    $sheet->setCellValue("I{$totRow}", "=SUBTOTAL(101, H6:H{$highestRow})");
+                    $sheet->setCellValueExplicit("A{$totRow}", 'TOTALES TOP COMPRADORES', DataType::TYPE_STRING);
+                    $sheet->setCellValueExplicit("G{$totRow}", "=SUBTOTAL(109, G6:G{$highestRow})", DataType::TYPE_FORMULA);
+                    $sheet->setCellValueExplicit("H{$totRow}", "=SUBTOTAL(109, H6:H{$highestRow})", DataType::TYPE_FORMULA);
+                    $sheet->setCellValueExplicit("I{$totRow}", "=SUBTOTAL(101, H6:H{$highestRow})", DataType::TYPE_FORMULA);
 
                     $sheet->getStyle("G{$totRow}")->getNumberFormat()->setFormatCode('#,##0');
                     $sheet->getStyle("H{$totRow}")->getNumberFormat()->setFormatCode('"$"#,##0.00');

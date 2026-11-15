@@ -2,6 +2,7 @@
 
 namespace App\Exports\Sheets;
 
+use App\Exports\Concerns\FormulaSafeValueBinder;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithCustomStartCell;
@@ -10,7 +11,6 @@ use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithTitle;
 use Maatwebsite\Excel\Events\AfterSheet;
-use PhpOffice\PhpSpreadsheet\Cell\Cell;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Cell\DefaultValueBinder;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
@@ -26,21 +26,23 @@ class CriticalStockSheet extends DefaultValueBinder implements
     WithEvents,
     WithCustomValueBinder
 {
+    use FormulaSafeValueBinder;
+
     protected array $criticalStock;
+    protected string $periodLabel;
+    protected string $generatedAt;
+    protected string $generatedBy;
 
-    public function __construct(array $criticalStock)
-    {
+    public function __construct(
+        array $criticalStock,
+        string $periodLabel = 'Período seleccionado',
+        string $generatedAt = '',
+        string $generatedBy = 'Sistema Administrativo'
+    ) {
         $this->criticalStock = $criticalStock;
-    }
-
-    public function bindValue(Cell $cell, mixed $value): bool
-    {
-        if ($cell->getColumn() === 'B') {
-            $cell->setValueExplicit((string) $value, DataType::TYPE_STRING);
-            return true;
-        }
-
-        return parent::bindValue($cell, $value);
+        $this->periodLabel = $periodLabel;
+        $this->generatedAt = $generatedAt ?: now()->format('d/m/Y H:i:s');
+        $this->generatedBy = $generatedBy;
     }
 
     public function title(): string
@@ -108,8 +110,7 @@ class CriticalStockSheet extends DefaultValueBinder implements
 
                 // 2. Subtítulo
                 $sheet->mergeCells('A2:G2');
-                $now = now()->format('d/m/Y H:i:s');
-                $sheet->setCellValue('A2', "Reporte generado el {$now} | Libros con 3 o menos unidades o agotados");
+                $sheet->setCellValue('A2', "Período del informe: {$this->periodLabel} | Snapshot inventario emitido: {$this->generatedAt} | Por: {$this->generatedBy}");
                 $sheet->getRowDimension(2)->setRowHeight(20);
 
                 $sheet->getStyle('A2')->applyFromArray([
@@ -172,9 +173,9 @@ class CriticalStockSheet extends DefaultValueBinder implements
                     $sheet->getRowDimension($totRow)->setRowHeight(25);
 
                     // Sin mergeCells para no romper el motor de ordenamiento ni cálculos de Excel
-                    $sheet->setCellValue("A{$totRow}", 'TOTAL LIBROS CON POCO STOCK O AGOTADOS');
-                    $sheet->setCellValue("F{$totRow}", "=SUBTOTAL(109, F6:F{$highestRow})");
-                    $sheet->setCellValue("G{$totRow}", '="Total: " & SUBTOTAL(103, C6:C' . $highestRow . ') & " títulos"');
+                    $sheet->setCellValueExplicit("A{$totRow}", 'TOTAL LIBROS CON POCO STOCK O AGOTADOS', DataType::TYPE_STRING);
+                    $sheet->setCellValueExplicit("F{$totRow}", "=SUBTOTAL(109, F6:F{$highestRow})", DataType::TYPE_FORMULA);
+                    $sheet->setCellValueExplicit("G{$totRow}", '="Total: " & SUBTOTAL(103, C6:C' . $highestRow . ') & " títulos"', DataType::TYPE_FORMULA);
 
                     $sheet->getStyle("F{$totRow}")->getNumberFormat()->setFormatCode('#,##0');
 

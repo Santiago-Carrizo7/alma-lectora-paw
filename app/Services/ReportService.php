@@ -31,19 +31,26 @@ class ReportService
         $averageTicket = $confirmedCount > 0 ? round($totalRevenue / $confirmedCount, 2) : 0.0;
         $conversionRate = $totalOrders > 0 ? round(($confirmedCount / $totalOrders) * 100, 1) : 0.0;
 
-        // Total book units sold in confirmed orders
-        $totalUnitsSold = 0;
+        // Explicit item-type breakdown in confirmed orders (H-16)
+        $bookUnitsSold = 0;
+        $accessoryUnitsSold = 0;
+        $comboUnitsSold = 0;
         foreach ($confirmedOrders as $order) {
             $items = is_array($order->items) ? $order->items : (json_decode($order->items, true) ?? []);
             foreach ($items as $item) {
-                if (($item['type'] ?? '') === 'BOOK') {
-                    $totalUnitsSold += (int) ($item['quantity'] ?? 1);
-                }
+                $qty = (int) ($item['quantity'] ?? 1);
+                match ($item['type'] ?? '') {
+                    'BOOK' => $bookUnitsSold += $qty,
+                    'ACCESSORY' => $accessoryUnitsSold += $qty,
+                    'COMBO' => $comboUnitsSold += $qty,
+                    default => null,
+                };
             }
         }
 
-        $totalBooksInCatalog = Book::withoutTrashed()->count();
-        $criticalStockCount = Book::withoutTrashed()->where('stock', '<=', 3)->count();
+        // Only active, non-archived books belong to catalog KPIs & alerts (H-18)
+        $totalBooksInCatalog = Book::active()->withoutTrashed()->count();
+        $criticalStockCount = Book::active()->withoutTrashed()->where('stock', '<=', 3)->count();
 
         return [
             'total_orders' => $totalOrders,
@@ -53,7 +60,10 @@ class ReportService
             'total_revenue' => $totalRevenue,
             'average_ticket' => $averageTicket,
             'conversion_rate' => $conversionRate,
-            'units_sold' => $totalUnitsSold,
+            'units_sold' => $bookUnitsSold,
+            'accessory_units_sold' => $accessoryUnitsSold,
+            'combo_units_sold' => $comboUnitsSold,
+            'total_item_units_sold' => $bookUnitsSold + $accessoryUnitsSold + $comboUnitsSold,
             'catalog_size' => $totalBooksInCatalog,
             'critical_stock_count' => $criticalStockCount,
         ];
@@ -148,7 +158,8 @@ class ReportService
      */
     public function getCriticalStockBooks(int $threshold = 3): Collection
     {
-        return Book::withoutTrashed()
+        return Book::active()
+            ->withoutTrashed()
             ->with('authors')
             ->where('stock', '<=', $threshold)
             ->orderBy('stock', 'asc')
@@ -167,15 +178,137 @@ class ReportService
     }
 
     /**
+     * Timeline of daily or monthly sales and order count for Recharts visualization.
+     */
+    public function getSalesTimeline(?Carbon $startDate = null, ?Carbon $endDate = null): array
+    {
+        if ($startDate && $endDate) {
+            $start = $startDate->copy()->startOfDay();
+            $end = $endDate->copy()->endOfDay();
+        } else {
+            // Full historical range ("all"): start at earliest order date so timeline matches KPIs (H-12)
+            $earliestOrder = OrderLead::min('created_at');
+            $start = $earliestOrder
+                ? Carbon::parse($earliestOrder)->startOfDay()
+                : now()->subDays(29)->startOfDay();
+            $end = now()->endOfDay();
+        }
+
+        $confirmedOrders = OrderLead::where('status', 'CONFIRMED')
+            ->whereBetween('created_at', [$start, $end])
+            ->get();
+
+        $diffDays = $start->diffInDays($end);
+        $timeline = [];
+
+        if ($diffDays <= 45) {
+            $cursor = $start->copy();
+            while ($cursor->lte($end)) {
+                $dayStr = $cursor->format('Y-m-d');
+                $label = $cursor->format('d/m');
+
+                $dayOrders = $confirmedOrders->filter(fn ($o) => $o->created_at->format('Y-m-d') === $dayStr);
+
+                $timeline[] = [
+                    'date' => $dayStr,
+                    'label' => $label,
+                    'ventas' => (float) $dayOrders->sum('total_amount'),
+                    'pedidos' => $dayOrders->count(),
+                ];
+
+                $cursor->addDay();
+            }
+        } else {
+            $cursor = $start->copy()->startOfMonth();
+            while ($cursor->lte($end)) {
+                $monthStr = $cursor->format('Y-m');
+                $label = $cursor->translatedFormat('M Y');
+
+                $monthOrders = $confirmedOrders->filter(fn ($o) => $o->created_at->format('Y-m') === $monthStr);
+
+                $timeline[] = [
+                    'date' => $monthStr,
+                    'label' => ucfirst($label),
+                    'ventas' => (float) $monthOrders->sum('total_amount'),
+                    'pedidos' => $monthOrders->count(),
+                ];
+
+                $cursor->addMonth();
+            }
+        }
+
+        return $timeline;
+    }
+
+    /**
+     * Orders distribution by status for conversion analysis.
+     */
+    public function getOrderStatusBreakdown(?Carbon $startDate = null, ?Carbon $endDate = null): array
+    {
+        $query = OrderLead::query();
+        if ($startDate && $endDate) {
+            $query->whereBetween('created_at', [$startDate, $endDate]);
+        }
+
+        $allOrders = $query->get();
+        $total = $allOrders->count();
+
+        $confirmed = $allOrders->where('status', 'CONFIRMED')->count();
+        $pending = $allOrders->where('status', 'PENDING_WHATSAPP')->count();
+        $cancelled = $allOrders->where('status', 'CANCELLED')->count();
+
+        return [
+            [
+                'status' => 'CONFIRMED',
+                'label' => 'Confirmados',
+                'cantidad' => $confirmed,
+                'porcentaje' => $total > 0 ? round(($confirmed / $total) * 100, 1) : 0,
+                'color' => '#2d5016',
+            ],
+            [
+                'status' => 'PENDING_WHATSAPP',
+                'label' => 'Pendientes WhatsApp',
+                'cantidad' => $pending,
+                'porcentaje' => $total > 0 ? round(($pending / $total) * 100, 1) : 0,
+                'color' => '#d97706',
+            ],
+            [
+                'status' => 'CANCELLED',
+                'label' => 'Cancelados',
+                'cantidad' => $cancelled,
+                'porcentaje' => $total > 0 ? round(($cancelled / $total) * 100, 1) : 0,
+                'color' => '#dc2626',
+            ],
+        ];
+    }
+
+    /**
      * Aggregate full dataset for dashboard display and reporting.
      */
-    public function getExecutiveReportData(?Carbon $startDate = null, ?Carbon $endDate = null): array
+    public function getExecutiveReportData(?Carbon $startDate = null, ?Carbon $endDate = null, string $period = '30_days'): array
     {
+        $periodLabel = match ($period) {
+            '7_days' => 'Últimos 7 días',
+            '30_days' => 'Últimos 30 días',
+            'current_month' => 'Mes actual (' . now()->translatedFormat('F Y') . ')',
+            'all' => 'Histórico completo',
+            'custom' => ($startDate && $endDate)
+                ? 'Del ' . $startDate->format('d/m/Y') . ' al ' . $endDate->format('d/m/Y')
+                : 'Rango personalizado',
+            default => 'Período seleccionado',
+        };
+
         return [
+            'period' => $period,
+            'period_label' => $periodLabel,
+            'period_start' => $startDate?->format('d/m/Y'),
+            'period_end' => $endDate?->format('d/m/Y'),
             'kpis' => $this->getSummaryKpis($startDate, $endDate),
-            'top_customers' => $this->getTopCustomers(5, $startDate, $endDate)->toArray(),
-            'best_selling_books' => $this->getBestSellingBooks(5, $startDate, $endDate)->toArray(),
-            'least_selling_books' => $this->getLeastSellingBooks(5, $startDate, $endDate)->toArray(),
+            'timeline' => $this->getSalesTimeline($startDate, $endDate),
+            'status_distribution' => $this->getOrderStatusBreakdown($startDate, $endDate),
+            'top_customers' => $this->getTopCustomers(8, $startDate, $endDate)->toArray(),
+            'best_selling_books' => $this->getBestSellingBooks(8, $startDate, $endDate)->toArray(),
+            'least_selling_books' => $this->getLeastSellingBooks(8, $startDate, $endDate)->toArray(),
             'no_sales_books' => $this->getBooksWithNoSales($startDate, $endDate)->take(10)->toArray(),
             'critical_stock' => $this->getCriticalStockBooks(3)->toArray(),
             'generated_at' => now()->format('d/m/Y H:i:s'),
@@ -202,7 +335,8 @@ class ReportService
                 if (($item['type'] ?? '') === 'BOOK' && !empty($item['id'])) {
                     $id = $item['id'];
                     $qty = (int) ($item['quantity'] ?? 1);
-                    $price = (float) ($item['unit_price'] ?? $item['price'] ?? 0);
+                    $price = (float) ($item['unit_price'] ?? $item['price'] ?? $item['unitPrice'] ?? 0);
+                    $lineRevenue = isset($item['subtotal']) ? (float) $item['subtotal'] : ($qty * $price);
 
                     if (!isset($salesMap[$id])) {
                         $salesMap[$id] = [
@@ -213,12 +347,12 @@ class ReportService
                     }
 
                     $salesMap[$id]['units_sold'] += $qty;
-                    $salesMap[$id]['total_revenue'] += ($qty * $price);
+                    $salesMap[$id]['total_revenue'] += $lineRevenue;
                 }
             }
         }
 
-        $catalogBooks = Book::withoutTrashed()->with('authors')->get();
+        $catalogBooks = Book::active()->withoutTrashed()->with('authors')->get();
 
         return $catalogBooks->map(function ($book) use ($salesMap) {
             $bookSales = $salesMap[$book->id] ?? null;

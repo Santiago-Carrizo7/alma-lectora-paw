@@ -2,30 +2,46 @@
 
 namespace App\Exports\Sheets;
 
+use App\Exports\Concerns\FormulaSafeValueBinder;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithCustomStartCell;
+use Maatwebsite\Excel\Concerns\WithCustomValueBinder;
 use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithTitle;
 use Maatwebsite\Excel\Events\AfterSheet;
+use PhpOffice\PhpSpreadsheet\Cell\DefaultValueBinder;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 
-class ExecutiveSummarySheet implements
+class ExecutiveSummarySheet extends DefaultValueBinder implements
     FromArray,
     WithHeadings,
     WithTitle,
     ShouldAutoSize,
     WithCustomStartCell,
-    WithEvents
+    WithEvents,
+    WithCustomValueBinder
 {
-    protected array $kpis;
+    use FormulaSafeValueBinder;
 
-    public function __construct(array $kpis)
-    {
+    protected array $kpis;
+    protected string $periodLabel;
+    protected string $generatedAt;
+    protected string $generatedBy;
+
+    public function __construct(
+        array $kpis,
+        string $periodLabel = 'Período seleccionado',
+        string $generatedAt = '',
+        string $generatedBy = 'Sistema Administrativo'
+    ) {
         $this->kpis = $kpis;
+        $this->periodLabel = $periodLabel;
+        $this->generatedAt = $generatedAt ?: now()->format('d/m/Y H:i:s');
+        $this->generatedBy = $generatedBy;
     }
 
     public function title(): string
@@ -56,35 +72,35 @@ class ExecutiveSummarySheet implements
         return [
             [
                 'Ventas',
-                'Total de ventas',
+                'Ventas confirmadas',
                 (float) ($k['total_revenue'] ?? 0),
                 'ARS ($)',
-                'Total acumulado en pedidos confirmados',
+                'Total acumulado en pedidos confirmados en el período',
             ],
             [
                 'Ventas',
                 'Ticket promedio',
                 (float) ($k['average_ticket'] ?? 0),
                 'ARS ($)',
-                'Promedio por cada compra confirmada',
+                'Promedio por pedido confirmado',
             ],
             [
                 'Pedidos',
                 'Total de pedidos',
                 (int) ($k['total_orders'] ?? 0),
                 'Pedidos',
-                'Cantidad total de pedidos recibidos',
+                'Cantidad total de pedidos recibidos en el período',
             ],
             [
                 'Pedidos',
                 'Pedidos confirmados',
                 (int) ($k['confirmed_orders'] ?? 0),
                 'Pedidos',
-                'Compras confirmadas',
+                'Compras confirmadas en el período',
             ],
             [
                 'Pedidos',
-                'Pedidos pendientes',
+                'Pedidos pendientes WhatsApp',
                 (int) ($k['pending_orders'] ?? 0),
                 'Pedidos',
                 'En espera de confirmación',
@@ -98,31 +114,35 @@ class ExecutiveSummarySheet implements
             ],
             [
                 'Efectividad',
-                'Porcentaje de confirmación',
-                ($k['total_orders'] ?? 0) > 0 ? (($k['confirmed_orders'] ?? 0) / ($k['total_orders'] ?? 1)) : 0,
+                'Tasa de confirmación',
+                (float) ($k['conversion_rate'] ?? 0),
                 'Porcentaje (%)',
-                'Porcentaje de pedidos confirmados sobre el total',
+                'Pedidos confirmados sobre total recibido',
             ],
             [
                 'Catálogo y Stock',
                 'Libros vendidos',
                 (int) ($k['units_sold'] ?? 0),
-                'Unidades',
-                'Total de libros en pedidos confirmados',
+                'Ejemplares',
+                sprintf(
+                    'Solo libros en pedidos confirmados (+%d acc. / %d combos)',
+                    (int) ($k['accessory_units_sold'] ?? 0),
+                    (int) ($k['combo_units_sold'] ?? 0)
+                ),
             ],
             [
                 'Catálogo y Stock',
-                'Libros en catálogo',
+                'Libros activos en catálogo',
                 (int) ($k['catalog_size'] ?? 0),
                 'Libros',
-                'Libros activos en la tienda',
+                'Libros publicados y no archivados',
             ],
             [
                 'Catálogo y Stock',
-                'Libros con poco stock (<= 3)',
+                'Libros con stock crítico (<= 3)',
                 (int) ($k['critical_stock_count'] ?? 0),
                 'Libros',
-                'Libros con 3 o menos unidades',
+                'Libros activos con 3 o menos unidades',
             ],
         ];
     }
@@ -157,8 +177,7 @@ class ExecutiveSummarySheet implements
 
                 // 2. Metadatos (A2:E2)
                 $sheet->mergeCells('A2:E2');
-                $now = now()->format('d/m/Y H:i:s');
-                $sheet->setCellValue('A2', "Reporte emitido el {$now}");
+                $sheet->setCellValue('A2', "Período: {$this->periodLabel} | Emitido: {$this->generatedAt} | Por: {$this->generatedBy}");
                 $sheet->getRowDimension(2)->setRowHeight(20);
 
                 $sheet->getStyle('A2')->applyFromArray([
@@ -231,13 +250,10 @@ class ExecutiveSummarySheet implements
                     $sheet->getStyle("E{$r}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
                 }
 
-                // Formatos contables y fórmulas en columna C
-                $sheet->getStyle('C6')->getNumberFormat()->setFormatCode('"$"#,##0.00'); // Ingresos
-                $sheet->setCellValue('C7', '=IF(C9>0, C6/C9, 0)');                         // Ticket Promedio dinámico
-                $sheet->getStyle('C7')->getNumberFormat()->setFormatCode('"$"#,##0.00');
+                // Formatos numéricos y contables (sin fórmulas sin caché para garantizar paridad al leer celdas)
+                $sheet->getStyle('C6:C7')->getNumberFormat()->setFormatCode('"$"#,##0.00'); // Ventas y Ticket
                 $sheet->getStyle('C8:C11')->getNumberFormat()->setFormatCode('#,##0');    // Pedidos
-                $sheet->setCellValue('C12', '=IF(C8>0, C9/C8, 0)');                        // Conversión dinámica
-                $sheet->getStyle('C12')->getNumberFormat()->setFormatCode('0.0%');
+                $sheet->getStyle('C12')->getNumberFormat()->setFormatCode('0.0"%"');      // Tasa confirmación
                 $sheet->getStyle('C13:C15')->getNumberFormat()->setFormatCode('#,##0');   // Libros / Stock
 
                 // Resaltar stock crítico en fila 15

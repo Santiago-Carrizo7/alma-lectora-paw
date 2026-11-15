@@ -2,6 +2,7 @@
 
 namespace App\Exports;
 
+use App\Exports\Concerns\FormulaSafeValueBinder;
 use App\Models\Accessory;
 use Illuminate\Database\Eloquent\Builder;
 use Maatwebsite\Excel\Concerns\Exportable;
@@ -9,16 +10,19 @@ use Maatwebsite\Excel\Concerns\FromQuery;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithColumnFormatting;
 use Maatwebsite\Excel\Concerns\WithCustomStartCell;
+use Maatwebsite\Excel\Concerns\WithCustomValueBinder;
 use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
 use Maatwebsite\Excel\Concerns\WithTitle;
 use Maatwebsite\Excel\Events\AfterSheet;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
+use PhpOffice\PhpSpreadsheet\Cell\DefaultValueBinder;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 
-class AccessoriesExport implements
+class AccessoriesExport extends DefaultValueBinder implements
     FromQuery,
     WithHeadings,
     WithMapping,
@@ -26,9 +30,11 @@ class AccessoriesExport implements
     WithCustomStartCell,
     WithColumnFormatting,
     WithEvents,
-    WithTitle
+    WithTitle,
+    WithCustomValueBinder
 {
     use Exportable;
+    use FormulaSafeValueBinder;
 
     protected array $filters;
 
@@ -39,16 +45,34 @@ class AccessoriesExport implements
 
     public function query(): Builder
     {
+        $hasActiveFilters = !empty($this->filters['search'])
+            || !empty($this->filters['category'])
+            || !empty($this->filters['stock_status'])
+            || !empty($this->filters['tab']);
+
+        if (!$hasActiveFilters) {
+            $query = Accessory::withTrashed()->with('category');
+            if (!empty($this->filters['sort'])) {
+                $query->filter(['sort' => $this->filters['sort']]);
+            } else {
+                $query->latest();
+            }
+
+            return $query;
+        }
+
         $tab = $this->filters['tab'] ?? 'available';
 
         $query = $tab === 'archived'
-            ? Accessory::onlyTrashed()
-            : Accessory::withoutTrashed();
+            ? Accessory::onlyTrashed()->with('category')
+            : Accessory::withoutTrashed()->with('category');
 
-        return $query->with('category')->filter([
-            'search' => $this->filters['search'] ?? null,
-            'category' => $this->filters['category'] ?? null,
-        ])->latest();
+        $query->filter($this->filters);
+        if (empty($this->filters['sort'])) {
+            $query->latest();
+        }
+
+        return $query;
     }
 
     public function startCell(): string
@@ -79,13 +103,13 @@ class AccessoriesExport implements
         $status = $accessory->trashed() ? 'Archivado' : ($accessory->is_active ? 'Activo' : 'Inactivo');
 
         return [
-            $accessory->id,
+            (string) $accessory->id,
             $accessory->title,
             $accessory->category?->label ?? $accessory->category_label ?? 'General',
             (float) $accessory->price,
             (int) $accessory->stock,
             $status,
-            $accessory->description ?: '-',
+            trim(strip_tags((string) ($accessory->description ?: ''))) ?: '-',
         ];
     }
 
@@ -104,9 +128,32 @@ class AccessoriesExport implements
                 $sheet = $event->sheet->getDelegate();
 
                 $highestRow = $sheet->getHighestRow();
+                $hasActiveFilters = !empty($this->filters['search'])
+                    || !empty($this->filters['category'])
+                    || !empty($this->filters['stock_status'])
+                    || !empty($this->filters['tab']);
+
                 $tab = $this->filters['tab'] ?? 'available';
-                $tabLabel = $tab === 'archived' ? 'Accesorios Archivados' : 'Catálogo Activo';
+                $tabLabel = !$hasActiveFilters
+                    ? 'Reporte Global (Disponibles + Archivados)'
+                    : ($tab === 'archived' ? 'Accesorios Archivados' : 'Catálogo Activo');
+
                 $search = !empty($this->filters['search']) ? $this->filters['search'] : 'Todos';
+                $category = !empty($this->filters['category']) ? $this->filters['category'] : 'Todas';
+                $stockLabel = match ($this->filters['stock_status'] ?? '') {
+                    'in_stock' => 'Con stock (> 0)',
+                    'low_stock' => 'Stock crítico (1 a 3)',
+                    'out_of_stock' => 'Agotados (0)',
+                    default => 'Todo',
+                };
+                $sortLabel = match ($this->filters['sort'] ?? '') {
+                    'price_asc' => 'Precio (Menor a Mayor)',
+                    'price_desc' => 'Precio (Mayor a Menor)',
+                    'stock_asc' => 'Stock (Menor a Mayor)',
+                    'stock_desc' => 'Stock (Mayor a Menor)',
+                    'title_asc' => 'Título (A-Z)',
+                    default => 'Más recientes',
+                };
                 $userName = auth()->user()?->name ?? 'Administración';
                 $generatedAt = now()->format('d/m/Y H:i:s');
 
@@ -134,7 +181,7 @@ class AccessoriesExport implements
 
                 // 2. Metadatos y Filtros (A2:G2)
                 $sheet->mergeCells('A2:G2');
-                $metaText = "Generado: {$generatedAt} | Usuario: {$userName} | Vista: {$tabLabel} | Filtro: \"{$search}\"";
+                $metaText = "Generado: {$generatedAt} | Usuario: {$userName} | Vista: {$tabLabel} | Búsqueda: \"{$search}\" | Categoría: {$category} | Stock: {$stockLabel} | Orden: {$sortLabel}";
                 $sheet->setCellValue('A2', $metaText);
                 $sheet->getRowDimension(2)->setRowHeight(20);
 
@@ -232,13 +279,12 @@ class AccessoriesExport implements
                     $sheet->getRowDimension($summaryRow)->setRowHeight(26);
 
                     // Sin mergeCells para no romper ordenamientos ni filtros
-                    $sheet->setCellValue("A{$summaryRow}", 'TOTALES Y PROMEDIOS');
-                    $sheet->setCellValue("D{$summaryRow}", "=SUBTOTAL(101, D6:D{$highestRow})");
-                    $sheet->setCellValue("E{$summaryRow}", "=SUBTOTAL(109, E6:E{$highestRow})");
-                    $sheet->setCellValue("F{$summaryRow}", '="Total: " & SUBTOTAL(103, B6:B' . $highestRow . ') & " accesorios"');
-                    $sheet->setCellValue("G{$summaryRow}", '');
+                    $sheet->setCellValueExplicit("A{$summaryRow}", 'TOTAL DISPONIBLE EN INVENTARIO', DataType::TYPE_STRING);
+                    $sheet->setCellValueExplicit("D{$summaryRow}", '', DataType::TYPE_STRING);
+                    $sheet->setCellValueExplicit("E{$summaryRow}", "=SUBTOTAL(109, E6:E{$highestRow})", DataType::TYPE_FORMULA);
+                    $sheet->setCellValueExplicit("F{$summaryRow}", '="Total: " & SUBTOTAL(103, B6:B' . $highestRow . ') & " accesorios"', DataType::TYPE_FORMULA);
+                    $sheet->setCellValueExplicit("G{$summaryRow}", '', DataType::TYPE_STRING);
 
-                    $sheet->getStyle("D{$summaryRow}")->getNumberFormat()->setFormatCode('"$"#,##0.00');
                     $sheet->getStyle("E{$summaryRow}")->getNumberFormat()->setFormatCode('#,##0');
 
                     $sheet->getStyle("A{$summaryRow}:G{$summaryRow}")->applyFromArray([

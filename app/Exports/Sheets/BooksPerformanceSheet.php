@@ -2,6 +2,7 @@
 
 namespace App\Exports\Sheets;
 
+use App\Exports\Concerns\FormulaSafeValueBinder;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithCustomStartCell;
@@ -10,7 +11,6 @@ use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithTitle;
 use Maatwebsite\Excel\Events\AfterSheet;
-use PhpOffice\PhpSpreadsheet\Cell\Cell;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Cell\DefaultValueBinder;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
@@ -26,25 +26,29 @@ class BooksPerformanceSheet extends DefaultValueBinder implements
     WithEvents,
     WithCustomValueBinder
 {
+    use FormulaSafeValueBinder;
+
     protected array $bestSelling;
     protected array $leastSelling;
     protected array $noSales;
+    protected string $periodLabel;
+    protected string $generatedAt;
+    protected string $generatedBy;
 
-    public function __construct(array $bestSelling, array $leastSelling, array $noSales)
-    {
+    public function __construct(
+        array $bestSelling,
+        array $leastSelling,
+        array $noSales,
+        string $periodLabel = 'Período seleccionado',
+        string $generatedAt = '',
+        string $generatedBy = 'Sistema Administrativo'
+    ) {
         $this->bestSelling = $bestSelling;
         $this->leastSelling = $leastSelling;
         $this->noSales = $noSales;
-    }
-
-    public function bindValue(Cell $cell, mixed $value): bool
-    {
-        if ($cell->getColumn() === 'B') {
-            $cell->setValueExplicit((string) $value, DataType::TYPE_STRING);
-            return true;
-        }
-
-        return parent::bindValue($cell, $value);
+        $this->periodLabel = $periodLabel;
+        $this->generatedAt = $generatedAt ?: now()->format('d/m/Y H:i:s');
+        $this->generatedBy = $generatedBy;
     }
 
     public function title(): string
@@ -95,6 +99,7 @@ class BooksPerformanceSheet extends DefaultValueBinder implements
         }
 
         // 2. Libros con Menor Rotación (> 0 ventas)
+        $leastRank = 1;
         foreach ($this->leastSelling as $book) {
             // Evitar duplicados si ya estaba en bestSelling
             $alreadyIncluded = collect($this->bestSelling)->contains('id', $book['id']);
@@ -103,7 +108,7 @@ class BooksPerformanceSheet extends DefaultValueBinder implements
             }
 
             $rows[] = [
-                'Menor rotación',
+                'Rotación #' . $leastRank++,
                 $book['isbn'] ?? 'S/D',
                 $book['title'] ?? 'Sin título',
                 $book['authors'] ?? 'Sin autor',
@@ -116,10 +121,11 @@ class BooksPerformanceSheet extends DefaultValueBinder implements
             ];
         }
 
-        // 3. Libros Sin Ventas Registradas
-        foreach (array_slice($this->noSales, 0, 15) as $book) {
+        // 3. Libros Sin Ventas Registradas (misma lista que la UI)
+        $noSalesRank = 1;
+        foreach ($this->noSales as $book) {
             $rows[] = [
-                'Sin ventas',
+                'Sin ventas #' . $noSalesRank++,
                 $book['isbn'] ?? 'S/D',
                 $book['title'] ?? 'Sin título',
                 $book['authors'] ?? 'Sin autor',
@@ -155,8 +161,7 @@ class BooksPerformanceSheet extends DefaultValueBinder implements
 
                 // 2. Subtítulo
                 $sheet->mergeCells('A2:J2');
-                $now = now()->format('d/m/Y H:i:s');
-                $sheet->setCellValue('A2', "Reporte generado el {$now} | Libros más vendidos y menor rotación");
+                $sheet->setCellValue('A2', "Período: {$this->periodLabel} | Emitido: {$this->generatedAt} | Por: {$this->generatedBy}");
                 $sheet->getRowDimension(2)->setRowHeight(20);
 
                 $sheet->getStyle('A2')->applyFromArray([
@@ -227,12 +232,12 @@ class BooksPerformanceSheet extends DefaultValueBinder implements
                     $sheet->getRowDimension($totRow)->setRowHeight(25);
 
                     // Sin mergeCells para no romper el motor de ordenamiento ni cálculos de Excel
-                    $sheet->setCellValue("A{$totRow}", 'TOTALES Y PROMEDIOS');
-                    $sheet->setCellValue("F{$totRow}", "=SUBTOTAL(101, F6:F{$highestRow})");
-                    $sheet->setCellValue("G{$totRow}", "=SUBTOTAL(109, G6:G{$highestRow})");
-                    $sheet->setCellValue("H{$totRow}", "=SUBTOTAL(109, H6:H{$highestRow})");
-                    $sheet->setCellValue("I{$totRow}", "=SUBTOTAL(109, I6:I{$highestRow})");
-                    $sheet->setCellValue("J{$totRow}", '');
+                    $sheet->setCellValueExplicit("A{$totRow}", 'TOTALES Y PROMEDIOS', DataType::TYPE_STRING);
+                    $sheet->setCellValueExplicit("F{$totRow}", "=SUBTOTAL(101, F6:F{$highestRow})", DataType::TYPE_FORMULA);
+                    $sheet->setCellValueExplicit("G{$totRow}", "=SUBTOTAL(109, G6:G{$highestRow})", DataType::TYPE_FORMULA);
+                    $sheet->setCellValueExplicit("H{$totRow}", "=SUBTOTAL(109, H6:H{$highestRow})", DataType::TYPE_FORMULA);
+                    $sheet->setCellValueExplicit("I{$totRow}", "=SUBTOTAL(109, I6:I{$highestRow})", DataType::TYPE_FORMULA);
+                    $sheet->setCellValueExplicit("J{$totRow}", '', DataType::TYPE_STRING);
 
                     $sheet->getStyle("F{$totRow}")->getNumberFormat()->setFormatCode('"$"#,##0.00');
                     $sheet->getStyle("G{$totRow}")->getNumberFormat()->setFormatCode('#,##0');
