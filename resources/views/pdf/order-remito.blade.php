@@ -232,9 +232,9 @@
         <tbody>
             @forelse($order->items as $item)
                 @php
-                    $unitPrice = floatval($item['unit_price'] ?? ($item['price'] ?? 0));
+                    $unitPrice = floatval($item['unit_price'] ?? ($item['price'] ?? ($item['unitPrice'] ?? 0)));
                     $qty = intval($item['quantity'] ?? 1);
-                    $subtotal = $unitPrice * $qty;
+                    $subtotal = isset($item['subtotal']) ? floatval($item['subtotal']) : ($unitPrice * $qty);
                 @endphp
                 <tr>
                     <td style="text-align: center;">

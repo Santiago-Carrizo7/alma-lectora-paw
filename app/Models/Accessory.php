@@ -69,7 +69,6 @@ class Accessory extends Model
         }
 
         $catId = AccessoryCategory::where('slug', $value)
-            ->orWhere('id', $value)
             ->orWhereRaw('LOWER(label) = ?', [mb_strtolower($value)])
             ->value('id');
 
@@ -111,6 +110,24 @@ class Accessory extends Model
                         });
                     }
                 });
+            })
+            ->when($filters['stock_status'] ?? null, function (Builder $q, string $stockStatus) {
+                match ($stockStatus) {
+                    'in_stock' => $q->where('stock', '>', 0),
+                    'low_stock' => $q->whereBetween('stock', [1, 3]),
+                    'out_of_stock' => $q->where('stock', '<=', 0),
+                    default => null,
+                };
+            })
+            ->when($filters['sort'] ?? null, function (Builder $q, string $sort) {
+                match ($sort) {
+                    'price_asc' => $q->orderBy('price', 'asc'),
+                    'price_desc' => $q->orderBy('price', 'desc'),
+                    'stock_asc' => $q->orderBy('stock', 'asc'),
+                    'stock_desc' => $q->orderBy('stock', 'desc'),
+                    'title_asc' => $q->orderBy('title', 'asc'),
+                    default => $q->latest(),
+                };
             });
     }
 

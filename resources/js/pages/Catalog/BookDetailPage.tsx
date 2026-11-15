@@ -13,7 +13,7 @@ interface BookDetailPageProps {
 
 export default function BookDetailPage({ book }: BookDetailPageProps) {
     const [addedToast, setAddedToast] = useState(false);
-    const { addItem, openCart } = useCart();
+    const { addItem } = useCart();
     const isOutOfStock = book.stock === 0;
     const cover = book.coverUrl || book.cover_url;
     const promoQty = book.promoQuantity || book.promo_quantity;
@@ -41,7 +41,6 @@ export default function BookDetailPage({ book }: BookDetailPageProps) {
         });
         setAddedToast(true);
         setTimeout(() => setAddedToast(false), 2000);
-        openCart();
     };
 
     return (

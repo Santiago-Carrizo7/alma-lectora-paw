@@ -4,6 +4,7 @@ import { useCart } from '../../lib/cart-store';
 import { formatPrice } from '../../lib/price';
 import type { Accessory } from '../../types/alma';
 import { ButtonEditorial } from '../ui/button-editorial';
+import { SafeImage } from '../ui/safe-image';
 
 interface AccessoryCardProps {
     accessory: Accessory;
@@ -11,7 +12,8 @@ interface AccessoryCardProps {
 }
 
 export const AccessoryCard = React.memo(function AccessoryCard({ accessory, onAddToCart }: AccessoryCardProps) {
-    const { addItem, openCart } = useCart();
+    const { addItem } = useCart();
+    const [added, setAdded] = React.useState(false);
     const isOutOfStock = accessory.stock === 0;
     const cover = accessory.coverUrl || accessory.cover_url;
     const promoQty = accessory.promoQuantity || accessory.promo_quantity;
@@ -34,7 +36,8 @@ export const AccessoryCard = React.memo(function AccessoryCard({ accessory, onAd
                 promoPrice: promoPrc,
                 stock: accessory.stock,
             });
-            openCart();
+            setAdded(true);
+            setTimeout(() => setAdded(false), 1200);
         }
     };
 
@@ -50,19 +53,14 @@ export const AccessoryCard = React.memo(function AccessoryCard({ accessory, onAd
                 className="flex flex-1 flex-col"
             >
                 <div className="bg-paper-dark relative flex aspect-square w-full items-center justify-center overflow-hidden shadow-inner">
-                    {cover ? (
-                        <img
-                            src={cover}
-                            alt={accessory.title}
-                            loading="lazy"
-                            decoding="async"
-                            className={`h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 ${
-                                isOutOfStock ? 'opacity-40 grayscale' : ''
-                            }`}
-                        />
-                    ) : (
-                        <div className="text-ink-muted flex h-full w-full flex-col items-center justify-center text-4xl">✨</div>
-                    )}
+                    <SafeImage
+                        src={cover}
+                        alt={accessory.title}
+                        className={`h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 ${
+                            isOutOfStock ? 'opacity-40 grayscale' : ''
+                        }`}
+                        fallback={<div className="text-ink-muted flex h-full w-full flex-col items-center justify-center text-4xl">✨</div>}
+                    />
 
                     {isOutOfStock && (
                         <div className="absolute inset-0 z-20 flex items-center justify-center bg-stone-950/70 select-none">
@@ -105,7 +103,7 @@ export const AccessoryCard = React.memo(function AccessoryCard({ accessory, onAd
                             aria-label={isOutOfStock ? `${accessory.title} está agotado` : `Agregar ${accessory.title} al carrito`}
                             className="px-2.5 py-1 text-xs font-semibold"
                         >
-                            {isOutOfStock ? 'Agotado' : 'Agregar'}
+                            {isOutOfStock ? 'Agotado' : added ? '¡Agregado! ✓' : 'Agregar'}
                         </ButtonEditorial>
                     </div>
                 </div>

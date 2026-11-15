@@ -15,15 +15,31 @@ class StoreConfig extends Model
     protected $fillable = [
         'whatsapp_phone',
         'instagram_url',
-        'shipping_cost',
-        'free_shipping_min',
-        'banner_message',
         'is_store_open',
     ];
 
     protected $casts = [
-        'shipping_cost' => 'decimal:2',
-        'free_shipping_min' => 'decimal:2',
         'is_store_open' => 'boolean',
     ];
+
+    protected $appends = [
+        'whatsappPhone',
+        'instagramUrl',
+        'isStoreOpen',
+    ];
+
+    public function getWhatsappPhoneAttribute(): ?string
+    {
+        return $this->attributes['whatsapp_phone'] ?? null;
+    }
+
+    public function getInstagramUrlAttribute(): ?string
+    {
+        return $this->attributes['instagram_url'] ?? null;
+    }
+
+    public function getIsStoreOpenAttribute(): bool
+    {
+        return (bool) ($this->attributes['is_store_open'] ?? true);
+    }
 }

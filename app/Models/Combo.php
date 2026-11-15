@@ -50,4 +50,48 @@ class Combo extends Model
     {
         return $query->where('is_active', true);
     }
+
+    public function scopeFilter(Builder $query, array $filters): Builder
+    {
+        $like = $query->getConnection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
+
+        $query->when($filters['search'] ?? null, function (Builder $q, string $search) use ($like) {
+            $term = trim($search);
+            $q->where(function (Builder $sub) use ($term, $like) {
+                $sub->where('title', $like, "%{$term}%")
+                    ->orWhere('description', $like, "%{$term}%")
+                    ->orWhereHas('books.book', function (Builder $bookQ) use ($term, $like) {
+                        $bookQ->where('title', $like, "%{$term}%")
+                            ->orWhereHas('authors', function (Builder $authorQ) use ($term, $like) {
+                                $authorQ->where('name', $like, "%{$term}%");
+                            });
+                    })
+                    ->orWhereHas('accessories.accessory', function (Builder $accQ) use ($term, $like) {
+                        $accQ->where('title', $like, "%{$term}%");
+                    });
+            });
+        });
+
+        $query->when($filters['stock_status'] ?? null, function (Builder $q, string $stockStatus) {
+            match ($stockStatus) {
+                'in_stock' => $q->where('stock', '>', 0),
+                'low_stock' => $q->whereBetween('stock', [1, 3]),
+                'out_of_stock' => $q->where('stock', '<=', 0),
+                default => null,
+            };
+        });
+
+        $query->when($filters['sort'] ?? null, function (Builder $q, string $sort) {
+            match ($sort) {
+                'price_asc' => $q->orderBy('price', 'asc'),
+                'price_desc' => $q->orderBy('price', 'desc'),
+                'stock_asc' => $q->orderBy('stock', 'asc'),
+                'stock_desc' => $q->orderBy('stock', 'desc'),
+                'title_asc' => $q->orderBy('title', 'asc'),
+                default => $q->latest(),
+            };
+        });
+
+        return $query;
+    }
 }

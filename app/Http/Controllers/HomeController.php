@@ -14,14 +14,7 @@ class HomeController extends Controller
     {
         $like = Book::query()->getConnection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
 
-        $bestSellers = Book::active()
-            ->with('authors')
-            ->where(function ($query) use ($like) {
-                $query->where('badge', $like, '%vendido%')
-                    ->orWhere('badge', $like, '%destacado%');
-            })
-            ->take(10)
-            ->get();
+        $bestSellers = Book::getDynamicBestSellers(12);
 
         if ($bestSellers->isEmpty()) {
             $bestSellers = Book::active()
@@ -30,6 +23,12 @@ class HomeController extends Controller
                 ->take(10)
                 ->get();
         }
+
+        $featuredBooks = Book::active()
+            ->with('authors')
+            ->where('badge', $like, '%destacado%')
+            ->take(10)
+            ->get();
 
         $novelties = Book::active()
             ->with('authors')
@@ -57,6 +56,7 @@ class HomeController extends Controller
 
         return Inertia::render('Catalog/HomePage', [
             'bestSellers' => $bestSellers,
+            'featuredBooks' => $featuredBooks,
             'novelties' => $novelties,
             'combos' => $combos,
             'featuredAccessories' => $featuredAccessories,

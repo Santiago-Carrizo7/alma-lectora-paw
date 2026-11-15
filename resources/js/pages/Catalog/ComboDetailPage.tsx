@@ -13,7 +13,7 @@ interface ComboDetailPageProps {
 
 export function ComboDetailPage({ combo }: ComboDetailPageProps) {
     const [addedToast, setAddedToast] = useState(false);
-    const { addItem, openCart } = useCart();
+    const { addItem } = useCart();
     const isOutOfStock = combo.stock === 0;
     const cover = combo.coverUrl || combo.cover_url;
     const promoQty = combo.promoQuantity || combo.promo_quantity;
@@ -40,7 +40,6 @@ export function ComboDetailPage({ combo }: ComboDetailPageProps) {
         });
         setAddedToast(true);
         setTimeout(() => setAddedToast(false), 2000);
-        openCart();
     };
 
     return (

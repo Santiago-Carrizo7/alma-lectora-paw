@@ -44,6 +44,6 @@ class CustomerOrderController extends Controller
 
         $shortId = strtoupper(substr($order->id, 0, 8));
 
-        return $pdf->stream("comprobante-orden-{$shortId}.pdf");
+        return $pdf->stream("remito-orden-{$shortId}.pdf");
     }
 }

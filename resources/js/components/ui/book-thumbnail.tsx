@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 interface BookThumbnailProps {
   src: string | null | undefined;
@@ -20,6 +20,10 @@ export function BookThumbnail({
   sizes = '(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 250px',
 }: BookThumbnailProps) {
   const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    setHasError(false);
+  }, [src]);
   const displayTitle = title || alt || '';
   const imageAlt = alt || (title ? `Portada del libro ${title}` : 'Portada del libro');
 

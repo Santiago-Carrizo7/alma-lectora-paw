@@ -6,7 +6,7 @@
     </h2>
 
     <p style="margin-top: 0; margin-bottom: 20px; color: #44403c; line-height: 1.6;">
-        Recibimos exitosamente tu solicitud de compra. Tus ejemplares y complementos ya han sido apartados en nuestro inventario para que nadie más los reserve.
+        Recibimos exitosamente tu solicitud de compra. La disponibilidad y el apartado de tus productos se confirman al coordinar el pedido con nuestro equipo por WhatsApp.
     </p>
 
     <!-- Caja de Resumen del Pedido -->
@@ -55,9 +55,9 @@
         <tbody>
             @foreach($order->items as $item)
                 @php
-                    $unitPrice = floatval($item['unit_price'] ?? ($item['price'] ?? 0));
+                    $unitPrice = floatval($item['unit_price'] ?? ($item['price'] ?? ($item['unitPrice'] ?? 0)));
                     $qty = intval($item['quantity'] ?? 1);
-                    $subtotal = $unitPrice * $qty;
+                    $subtotal = isset($item['subtotal']) ? floatval($item['subtotal']) : ($unitPrice * $qty);
                 @endphp
                 <tr style="border-bottom: 1px solid #f0eae1;">
                     <td style="padding: 10px 14px; font-size: 13px; color: #1c1917;">

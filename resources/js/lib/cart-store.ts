@@ -34,6 +34,7 @@ export function getItemSubtotal(item: CartItem): number {
 interface CartState {
     items: CartItem[];
     isOpen: boolean;
+    stockWarnings: Record<string, string>;
 }
 
 interface CartActions {
@@ -41,6 +42,10 @@ interface CartActions {
     removeItem: (id: string) => void;
     incrementItem: (id: string) => void;
     decrementItem: (id: string) => void;
+    updateItemStock: (id: string, stock: number) => void;
+    syncStocks: (stockMap: Record<string, number>) => void;
+    setStockWarnings: (warnings: Record<string, string>) => void;
+    clearItemWarning: (id: string) => void;
     clearCart: () => void;
     openCart: () => void;
     closeCart: () => void;
@@ -53,6 +58,7 @@ export const useCartStore = create<CartStore>()(
         (set) => ({
             items: [],
             isOpen: false,
+            stockWarnings: {},
 
             addItem: (incoming) =>
                 set((state) => {
@@ -68,7 +74,8 @@ export const useCartStore = create<CartStore>()(
                                 i.id === incoming.id
                                     ? {
                                           ...i,
-                                          quantity: Math.min(i.quantity + addQty, i.stock),
+                                          stock: incoming.stock,
+                                          quantity: Math.min(i.quantity + addQty, incoming.stock),
                                       }
                                     : i
                             ),
@@ -87,9 +94,14 @@ export const useCartStore = create<CartStore>()(
                 }),
 
             removeItem: (id) =>
-                set((state) => ({
-                    items: state.items.filter((i) => i.id !== id),
-                })),
+                set((state) => {
+                    const nextWarnings = { ...state.stockWarnings };
+                    delete nextWarnings[id];
+                    return {
+                        items: state.items.filter((i) => i.id !== id),
+                        stockWarnings: nextWarnings,
+                    };
+                }),
 
             incrementItem: (id) =>
                 set((state) => ({
@@ -105,17 +117,48 @@ export const useCartStore = create<CartStore>()(
 
             decrementItem: (id) =>
                 set((state) => ({
-                    items: state.items
-                        .map((i) => (i.id === id ? { ...i, quantity: i.quantity - 1 } : i))
-                        .filter((i) => i.quantity > 0),
+                    items: state.items.map((i) =>
+                        i.id === id ? { ...i, quantity: Math.max(1, i.quantity - 1) } : i
+                    ),
                 })),
 
-            clearCart: () => set({ items: [] }),
+            updateItemStock: (id, stock) =>
+                set((state) => ({
+                    items: state.items.map((i) =>
+                        i.id === id ? { ...i, stock } : i
+                    ),
+                })),
+
+            syncStocks: (stockMap) =>
+                set((state) => ({
+                    items: state.items.map((i) => {
+                        if (stockMap[i.id] === undefined) return i;
+                        const updatedStock = stockMap[i.id];
+                        return {
+                            ...i,
+                            stock: updatedStock,
+                            quantity: updatedStock > 0 ? Math.min(i.quantity, updatedStock) : i.quantity,
+                        };
+                    }),
+                })),
+
+            setStockWarnings: (warnings) => set({ stockWarnings: warnings }),
+
+            clearItemWarning: (id) =>
+                set((state) => {
+                    if (!state.stockWarnings[id]) return state;
+                    const next = { ...state.stockWarnings };
+                    delete next[id];
+                    return { stockWarnings: next };
+                }),
+
+            clearCart: () => set({ items: [], stockWarnings: {} }),
             openCart: () => set({ isOpen: true }),
             closeCart: () => set({ isOpen: false }),
         }),
         {
             name: 'alma-lectora-cart',
+            partialize: (state) => ({ items: state.items }),
         }
     )
 );
@@ -123,10 +166,15 @@ export const useCartStore = create<CartStore>()(
 export function useCart() {
     const items = useCartStore((state) => state.items);
     const isOpen = useCartStore((state) => state.isOpen);
+    const stockWarnings = useCartStore((state) => state.stockWarnings);
     const addItem = useCartStore((state) => state.addItem);
     const removeItem = useCartStore((state) => state.removeItem);
     const incrementItem = useCartStore((state) => state.incrementItem);
     const decrementItem = useCartStore((state) => state.decrementItem);
+    const updateItemStock = useCartStore((state) => state.updateItemStock);
+    const syncStocks = useCartStore((state) => state.syncStocks);
+    const setStockWarnings = useCartStore((state) => state.setStockWarnings);
+    const clearItemWarning = useCartStore((state) => state.clearItemWarning);
     const clearCart = useCartStore((state) => state.clearCart);
     const openCart = useCartStore((state) => state.openCart);
     const closeCart = useCartStore((state) => state.closeCart);
@@ -144,12 +192,17 @@ export function useCart() {
     return {
         items,
         isOpen,
+        stockWarnings,
         totalItems,
         totalAmount,
         addItem,
         removeItem,
         incrementItem,
         decrementItem,
+        updateItemStock,
+        syncStocks,
+        setStockWarnings,
+        clearItemWarning,
         clearCart,
         openCart,
         closeCart,

@@ -4,11 +4,12 @@ import { ButtonEditorial } from '../ui/button-editorial';
 
 interface StepCustomerProps {
     initialData: CustomerFormData | null;
+    serverErrors?: Record<string, string[]>;
     onNext: (data: CustomerFormData) => void;
     onBack: () => void;
 }
 
-export function StepCustomer({ initialData, onNext, onBack }: StepCustomerProps) {
+export function StepCustomer({ initialData, serverErrors, onNext, onBack }: StepCustomerProps) {
     const [customerName, setCustomerName] = useState(initialData?.customerName ?? '');
     const [customerEmail, setCustomerEmail] = useState(initialData?.customerEmail ?? '');
     const [customerDni, setCustomerDni] = useState(initialData?.customerDni ?? '');
@@ -24,6 +25,16 @@ export function StepCustomer({ initialData, onNext, onBack }: StepCustomerProps)
             !customerPhone.trim()
         ) {
             setError('Por favor completá todos los datos personales solicitados.');
+            return;
+        }
+
+        if (customerDni.trim().length < 5) {
+            setError('El DNI o CUIT debe tener al menos 5 caracteres.');
+            return;
+        }
+
+        if (customerPhone.trim().length < 6) {
+            setError('El teléfono móvil debe tener al menos 6 caracteres.');
             return;
         }
 
@@ -75,6 +86,9 @@ export function StepCustomer({ initialData, onNext, onBack }: StepCustomerProps)
                         className="border-paper-dark bg-paper text-ink placeholder-stone-400 focus:ring-forest/25 focus:border-forest block w-full rounded-md border px-3.5 py-2.5 text-sm transition-colors focus:outline-none focus:ring-2"
                         required
                     />
+                    {serverErrors?.customer_name?.[0] && (
+                        <p className="mt-1 text-xs font-medium text-red-600">{serverErrors.customer_name[0]}</p>
+                    )}
                 </div>
 
                 {/* DNI / CUIT */}
@@ -94,6 +108,9 @@ export function StepCustomer({ initialData, onNext, onBack }: StepCustomerProps)
                         className="border-paper-dark bg-paper text-ink placeholder-stone-400 focus:ring-forest/25 focus:border-forest block w-full rounded-md border px-3.5 py-2.5 text-sm transition-colors focus:outline-none focus:ring-2"
                         required
                     />
+                    {serverErrors?.customer_dni?.[0] && (
+                        <p className="mt-1 text-xs font-medium text-red-600">{serverErrors.customer_dni[0]}</p>
+                    )}
                 </div>
 
                 {/* Teléfono de Contacto */}
@@ -113,6 +130,9 @@ export function StepCustomer({ initialData, onNext, onBack }: StepCustomerProps)
                         className="border-paper-dark bg-paper text-ink placeholder-stone-400 focus:ring-forest/25 focus:border-forest block w-full rounded-md border px-3.5 py-2.5 text-sm transition-colors focus:outline-none focus:ring-2"
                         required
                     />
+                    {serverErrors?.customer_phone?.[0] && (
+                        <p className="mt-1 text-xs font-medium text-red-600">{serverErrors.customer_phone[0]}</p>
+                    )}
                 </div>
 
                 {/* Correo Electrónico */}
@@ -132,6 +152,9 @@ export function StepCustomer({ initialData, onNext, onBack }: StepCustomerProps)
                         className="border-paper-dark bg-paper text-ink placeholder-stone-400 focus:ring-forest/25 focus:border-forest block w-full rounded-md border px-3.5 py-2.5 text-sm transition-colors focus:outline-none focus:ring-2"
                         required
                     />
+                    {serverErrors?.customer_email?.[0] && (
+                        <p className="mt-1 text-xs font-medium text-red-600">{serverErrors.customer_email[0]}</p>
+                    )}
                 </div>
             </div>
 

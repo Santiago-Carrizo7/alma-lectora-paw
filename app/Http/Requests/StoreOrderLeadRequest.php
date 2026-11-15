@@ -28,7 +28,7 @@ class StoreOrderLeadRequest extends FormRequest
             'customer_dni' => ['required', 'string', 'min:5', 'max:20'],
             'postal_code' => ['nullable', 'string', 'max:20'],
             'address' => ['nullable', 'string', 'max:255'],
-            'items' => ['required', 'array', 'min:1'],
+            'items' => ['required', 'array', 'min:1', 'max:30'],
             'items.*.id' => ['required', 'uuid'],
             'items.*.type' => ['required', 'string', 'in:BOOK,ACCESSORY,COMBO'],
             'items.*.title' => ['required', 'string', 'max:255'],
@@ -51,6 +51,7 @@ class StoreOrderLeadRequest extends FormRequest
             'customer_dni.required' => 'El DNI o CUIT es obligatorio.',
             'items.required' => 'El carrito no puede estar vacío.',
             'items.min' => 'Debes incluir al menos un producto en el pedido.',
+            'items.max' => 'No podés incluir más de 30 ítems distintos en un mismo pedido.',
         ];
     }
 }

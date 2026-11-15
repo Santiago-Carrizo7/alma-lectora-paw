@@ -1,6 +1,7 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import { AccessoryCard } from '../../components/catalog/accessory-card';
 import { SearchBar } from '../../components/catalog/search-bar';
+import { PaginationLinks } from '../../components/ui/pagination-links';
 import { PageShell } from '../../layouts/page-shell';
 import { getSectionSlice } from '../../lib/catalog-utils';
 import type { Accessory, AccessoryCategory, PaginatedData } from '../../types/alma';
@@ -188,33 +189,8 @@ export function AccessoriesPage({ accessories, categories = [], filters = {} }: 
                 )}
 
                 {accessories.links && accessories.links.length > 3 && (
-                    <div className="border-paper-dark flex items-center justify-center gap-1 border-t pt-6">
-                        {accessories.links.map((link, idx) => {
-                            if (!link.url) {
-                                return (
-                                    <span
-                                        key={idx}
-                                        className="rounded-md border border-transparent px-3 py-1.5 text-xs text-stone-400 select-none"
-                                        dangerouslySetInnerHTML={{ __html: link.label }}
-                                    />
-                                );
-                            }
-
-                            return (
-                                <Link
-                                    key={idx}
-                                    href={link.url}
-                                    preserveState
-                                    preserveScroll
-                                    className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
-                                        link.active
-                                            ? 'bg-forest border-forest text-white shadow-xs'
-                                            : 'hover:bg-paper-dark border-stone-200 text-stone-700'
-                                    }`}
-                                    dangerouslySetInnerHTML={{ __html: link.label }}
-                                />
-                            );
-                        })}
+                    <div className="border-paper-dark flex items-center justify-center border-t pt-6">
+                        <PaginationLinks links={accessories.links} />
                     </div>
                 )}
             </div>

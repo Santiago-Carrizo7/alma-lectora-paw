@@ -56,7 +56,17 @@ class User extends Authenticatable
 
     public function isAdmin(): bool
     {
-        return $this->hasRole(['super-admin', 'admin']) || $this->role === 'admin';
+        if ($this->hasRole(['super-admin', 'admin'])) {
+            return true;
+        }
+
+        // Custom Spatie roles (excluding client/guest) that carry permissions may enter the admin panel,
+        // where each module and action is enforced by Spatie `permission:` middleware.
+        $hasCustomAdminRole = $this->roles()
+            ->whereNotIn('name', ['client', 'guest'])
+            ->exists();
+
+        return $hasCustomAdminRole && $this->getAllPermissions()->isNotEmpty();
     }
 
     public function orders(): \Illuminate\Database\Eloquent\Relations\HasMany

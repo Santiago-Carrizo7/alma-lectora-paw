@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
 interface ImageCarouselProps {
   images: string[];
@@ -10,8 +10,15 @@ interface ImageCarouselProps {
 
 export function ImageCarousel({ images, alt, className = '', badge, outOfStock }: ImageCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [brokenUrls, setBrokenUrls] = useState<Record<string, boolean>>({});
 
   const validImages = images.filter(Boolean);
+
+  useEffect(() => {
+    if (currentIndex >= validImages.length) {
+      setCurrentIndex(0);
+    }
+  }, [currentIndex, validImages.length]);
 
   if (validImages.length === 0) {
     return (
@@ -31,15 +38,30 @@ export function ImageCarousel({ images, alt, className = '', badge, outOfStock }
     setCurrentIndex((prev) => (prev === validImages.length - 1 ? 0 : prev + 1));
   };
 
+  const safeIndex = currentIndex >= validImages.length ? 0 : currentIndex;
+  const activeUrl = validImages[safeIndex];
+  const isCurrentBroken = Boolean(activeUrl && brokenUrls[activeUrl]);
+
   return (
     <div className={`relative overflow-hidden group ${className}`}>
-      <img
-        src={validImages[currentIndex]}
-        alt={`${alt} - Imagen ${currentIndex + 1}`}
-        className={`w-full h-full object-cover rounded-lg transition-opacity duration-300 ${
-          outOfStock ? 'grayscale opacity-75' : ''
-        }`}
-      />
+      {isCurrentBroken ? (
+        <div className="bg-paper-dark flex h-full w-full items-center justify-center rounded-lg text-center font-serif text-xs text-stone-400 p-4">
+          Imagen no disponible
+        </div>
+      ) : (
+        <img
+          src={activeUrl}
+          alt={`${alt} - Imagen ${currentIndex + 1}`}
+          onError={() => {
+            if (activeUrl) {
+              setBrokenUrls((prev) => ({ ...prev, [activeUrl]: true }));
+            }
+          }}
+          className={`w-full h-full object-cover rounded-lg transition-opacity duration-300 ${
+            outOfStock ? 'grayscale opacity-75' : ''
+          }`}
+        />
+      )}
 
       {badge && (
         <span className="absolute top-2.5 left-2.5 bg-amber text-white font-sans text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-sm shadow-xs">

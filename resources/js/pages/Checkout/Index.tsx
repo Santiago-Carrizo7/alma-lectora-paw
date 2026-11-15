@@ -17,6 +17,7 @@ export default function CheckoutIndex() {
     const { props } = usePage<SharedData>();
     const user = props.auth?.user as Record<string, any> | null;
     const storeConfig = props.storeConfig;
+    const isStoreOpen = storeConfig?.is_store_open ?? storeConfig?.isStoreOpen ?? true;
     const { items, totalAmount, clearCart } = useCart();
 
     const [step, setStep] = useState<CheckoutStep>(0);
@@ -42,6 +43,7 @@ export default function CheckoutIndex() {
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
     const [completedOrder, setCompletedOrder] = useState<{
         orderId: string;
         whatsappUrl: string;
@@ -66,10 +68,15 @@ export default function CheckoutIndex() {
     const handleCustomerNext = (data: CustomerFormData) => {
         setCustomer(data);
         setErrorMessage(null);
+        setFieldErrors({});
         setStep(2);
     };
 
     const handleConfirmOrder = async () => {
+        if (!isStoreOpen) {
+            setErrorMessage('No están disponibles los envíos por WhatsApp en estos momentos, la tienda se encuentra temporalmente cerrada.');
+            return;
+        }
         if (!shipping || !customer || items.length === 0) return;
 
         setIsSubmitting(true);
@@ -110,9 +117,23 @@ export default function CheckoutIndex() {
             const data = await response.json();
 
             if (!response.ok) {
+                const rawErrors = (data.errors ?? {}) as Record<string, string[]>;
+                setFieldErrors(rawErrors);
+
+                const hasCustomerFieldErrors = ['customer_name', 'customer_dni', 'customer_phone', 'customer_email'].some(
+                    (key) => Boolean(rawErrors[key]?.length),
+                );
+                if (hasCustomerFieldErrors) {
+                    setStep(1);
+                } else if (rawErrors.postal_code?.length || rawErrors.address?.length) {
+                    setStep(0);
+                }
+
+                const firstFieldError = Object.values(rawErrors).flat()[0];
                 const errorText =
-                    data.errors?.stock?.[0] ||
-                    data.errors?.store?.[0] ||
+                    rawErrors.stock?.[0] ||
+                    rawErrors.store?.[0] ||
+                    firstFieldError ||
                     data.message ||
                     'Ocurrió un inconveniente al validar tu pedido.';
                 setErrorMessage(errorText);
@@ -124,6 +145,8 @@ export default function CheckoutIndex() {
             const whatsappPhone =
                 storeConfig?.whatsapp_phone || storeConfig?.whatsappPhone || '5493875708557';
 
+            const serverTotalAmount = data.totalAmount ?? totalAmount;
+
             const whatsappUrl = buildWhatsAppUrl(
                 {
                     customerName: customer.customerName,
@@ -134,7 +157,7 @@ export default function CheckoutIndex() {
                     address: shipping.address,
                 },
                 items,
-                totalAmount,
+                serverTotalAmount,
                 whatsappPhone
             );
 
@@ -195,8 +218,18 @@ export default function CheckoutIndex() {
                                 rel="noopener noreferrer"
                                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#25D366] hover:bg-[#20ba59] py-3 px-4 font-semibold text-white shadow-md transition-all cursor-pointer text-sm"
                             >
-                                <svg className="h-5 w-5 fill-current" viewBox="0 0 24 24">
-                                    <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z" />
+                                <svg
+                                    className="h-5 w-5 shrink-0"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    viewBox="0 0 24 24"
+                                    aria-hidden="true"
+                                >
+                                    <path d="M3 21l1.65-3.8a9 9 0 1 1 3.4 2.9L3 21" />
+                                    <path d="M9 10a.5.5 0 0 0 1 0V9a.5.5 0 0 0-1 0v1a5 5 0 0 0 5 5h1a.5.5 0 0 0 0-1h-1a.5.5 0 0 0 0 1" />
                                 </svg>
                                 <span>Abrir conversación en WhatsApp</span>
                             </a>
@@ -259,6 +292,12 @@ export default function CheckoutIndex() {
             <Head title="Finalizar Compra — Checkout | Alma Lectora" />
 
             <div className="mx-auto max-w-2xl py-6">
+                {!isStoreOpen && (
+                    <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-xs font-semibold text-amber-950 shadow-2xs sm:text-sm">
+                        ⚠️ En estos momentos no estamos recibiendo pedidos por WhatsApp. La tienda se encuentra temporalmente cerrada.
+                    </div>
+                )}
+
                 {/* Banner de Usuario / Invitado */}
                 {user ? (
                     <div className="mb-4 bg-forest/10 border border-forest/30 text-forest text-xs rounded-xl p-3 flex items-center justify-between">
@@ -312,6 +351,7 @@ export default function CheckoutIndex() {
                         {step === 1 && (
                             <StepCustomer
                                 initialData={customer}
+                                serverErrors={fieldErrors}
                                 onNext={handleCustomerNext}
                                 onBack={() => setStep(0)}
                             />

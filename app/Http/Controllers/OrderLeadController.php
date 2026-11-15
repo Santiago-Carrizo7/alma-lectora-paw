@@ -8,12 +8,15 @@ use App\Models\Book;
 use App\Models\Combo;
 use App\Models\OrderLead;
 use App\Models\StoreConfig;
+use App\Services\OrderService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class OrderLeadController extends Controller
 {
+    public function __construct(protected OrderService $orderService) {}
     /**
      * Show the checkout page.
      */
@@ -23,41 +26,95 @@ class OrderLeadController extends Controller
     }
 
     /**
+     * Verify real-time stock availability and store status for cart items.
+     */
+    public function verifyStock(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'items' => 'required|array',
+            'items.*.id' => 'required|string',
+            'items.*.type' => 'required|in:BOOK,ACCESSORY,COMBO',
+            'items.*.quantity' => 'required|integer|min:1',
+        ]);
+
+        $config = StoreConfig::first();
+        $isStoreOpen = (bool) ($config?->is_store_open ?? true);
+
+        $allValid = true;
+        $resultsById = [];
+
+        foreach ($validated['items'] as $item) {
+            $id = (string) $item['id'];
+            $type = (string) $item['type'];
+            $qty = (int) $item['quantity'];
+
+            $product = match ($type) {
+                'BOOK' => Book::active()->find($id),
+                'ACCESSORY' => Accessory::active()->find($id),
+                'COMBO' => Combo::active()->find($id),
+                default => null,
+            };
+
+            $available = $product ? (int) $product->stock : 0;
+            $isValid = $product !== null && $qty <= $available;
+
+            $message = null;
+            if (! $isValid) {
+                $allValid = false;
+                $noun = $type === 'BOOK' ? 'este libro' : 'este producto';
+
+                if ($available <= 0) {
+                    $message = 'Este producto ya no tiene stock disponible.';
+                } elseif ($available === 1) {
+                    $message = "Solamente nos queda 1 unidad de {$noun}.";
+                } else {
+                    $message = "Solamente nos quedan {$available} unidades de {$noun}.";
+                }
+            }
+
+            $resultsById[$id] = [
+                'id' => $id,
+                'available_stock' => $available,
+                'requested_quantity' => $qty,
+                'valid' => $isValid,
+                'message' => $message,
+            ];
+        }
+
+        return response()->json([
+            'valid' => $allValid,
+            'is_store_open' => $isStoreOpen,
+            'items' => $resultsById,
+        ]);
+    }
+
+    /**
      * Validate stock and persist the order lead before WhatsApp redirection.
      */
     public function store(StoreOrderLeadRequest $request): JsonResponse
     {
         $config = StoreConfig::first();
         if (! ($config?->is_store_open ?? true)) {
+            $closedMessage = 'No están disponibles los envíos por WhatsApp en estos momentos, la tienda se encuentra temporalmente cerrada.';
+
             return response()->json([
-                'message' => 'La tienda se encuentra temporalmente cerrada para nuevos pedidos.',
+                'message' => $closedMessage,
                 'errors' => [
-                    'store' => ['La tienda se encuentra temporalmente cerrada para nuevos pedidos.'],
+                    'store' => [$closedMessage],
                 ],
             ], 422);
         }
 
-        $items = $request->input('items', []);
+        $rawItems = $request->input('items', []);
+        $verified = $this->orderService->buildVerifiedOrderPayload($rawItems);
 
-        foreach ($items as $item) {
-            $product = match ($item['type']) {
-                'BOOK' => Book::active()->find($item['id']),
-                'ACCESSORY' => Accessory::active()->find($item['id']),
-                'COMBO' => Combo::active()->find($item['id']),
-                default => null,
-            };
-
-            if (! $product || $item['quantity'] > $product->stock) {
-                $available = $product ? $product->stock : 0;
-                $message = "Stock insuficiente para {$item['title']}. Disponibles: {$available}";
-
-                return response()->json([
-                    'message' => $message,
-                    'errors' => [
-                        'stock' => [$message],
-                    ],
-                ], 422);
-            }
+        if (isset($verified['error'])) {
+            return response()->json([
+                'message' => $verified['error'],
+                'errors' => [
+                    'stock' => [$verified['error']],
+                ],
+            ], 422);
         }
 
         $orderLead = OrderLead::create([
@@ -68,8 +125,8 @@ class OrderLeadController extends Controller
             'customer_dni' => $request->input('customer_dni'),
             'postal_code' => $request->input('postal_code'),
             'address' => $request->input('address'),
-            'items' => $items,
-            'total_amount' => $request->input('total_amount'),
+            'items' => $verified['items'],
+            'total_amount' => $verified['total_amount'],
             'status' => 'PENDING_WHATSAPP',
         ]);
 
@@ -85,6 +142,7 @@ class OrderLeadController extends Controller
         return response()->json([
             'success' => true,
             'orderId' => $orderLead->id,
+            'totalAmount' => (float) $orderLead->total_amount,
         ], 201);
     }
 }

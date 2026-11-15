@@ -15,7 +15,7 @@ interface AccessoryDetailPageProps {
 
 export function AccessoryDetailPage({ accessory, relatedAccessories = [] }: AccessoryDetailPageProps) {
     const [addedToast, setAddedToast] = useState(false);
-    const { addItem, openCart } = useCart();
+    const { addItem } = useCart();
     const isOutOfStock = accessory.stock === 0;
     const cover = accessory.coverUrl || accessory.cover_url;
     const promoQty = accessory.promoQuantity || accessory.promo_quantity;
@@ -37,7 +37,6 @@ export function AccessoryDetailPage({ accessory, relatedAccessories = [] }: Acce
         });
         setAddedToast(true);
         setTimeout(() => setAddedToast(false), 2000);
-        openCart();
     };
 
     return (

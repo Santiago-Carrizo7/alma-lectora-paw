@@ -1,4 +1,5 @@
 import { Head, Link } from '@inertiajs/react';
+import { PaginationLinks } from '../../../components/ui/pagination-links';
 import { PageShell } from '../../../layouts/page-shell';
 import { formatPrice } from '../../../lib/price';
 import { buildWhatsAppUrl } from '../../../lib/whatsapp';
@@ -8,7 +9,9 @@ interface OrderItemData {
     type: 'BOOK' | 'ACCESSORY' | 'COMBO';
     title: string;
     quantity: number;
-    unit_price: number;
+    unit_price?: number;
+    unitPrice?: number;
+    subtotal?: number;
     author?: string;
 }
 
@@ -71,7 +74,7 @@ export default function CustomerOrders({ orders, whatsappPhone }: CustomerOrders
             id: it.id,
             type: it.type,
             title: it.title,
-            price: it.unit_price,
+            price: it.unit_price ?? it.unitPrice ?? 0,
             quantity: it.quantity,
             author: it.author,
             stock: 99,
@@ -163,7 +166,7 @@ export default function CustomerOrders({ orders, whatsappPhone }: CustomerOrders
                                                         <span className="text-ink-muted text-[11px] ml-1">x{item.quantity}</span>
                                                     </div>
                                                     <span className="font-mono font-semibold text-ink shrink-0">
-                                                        {formatPrice(item.unit_price * item.quantity)}
+                                                        {formatPrice(item.subtotal ?? (item.unit_price ?? item.unitPrice ?? 0) * item.quantity)}
                                                     </span>
                                                 </div>
                                             ))}
@@ -205,21 +208,8 @@ export default function CustomerOrders({ orders, whatsappPhone }: CustomerOrders
 
                         {/* Paginación */}
                         {orders.last_page > 1 && (
-                            <div className="flex justify-center gap-1 pt-4">
-                                {orders.links.map((link, idx) => (
-                                    <Link
-                                        key={idx}
-                                        href={link.url || '#'}
-                                        dangerouslySetInnerHTML={{ __html: link.label }}
-                                        className={`px-3 py-1 text-xs rounded-lg transition-colors ${
-                                            link.active
-                                                ? 'bg-forest text-stone-100 font-bold'
-                                                : link.url
-                                                ? 'hover:bg-paper-dark text-ink'
-                                                : 'text-stone-300 pointer-events-none'
-                                        }`}
-                                    />
-                                ))}
+                            <div className="flex justify-center pt-4">
+                                <PaginationLinks links={orders.links} />
                             </div>
                         )}
                     </div>
