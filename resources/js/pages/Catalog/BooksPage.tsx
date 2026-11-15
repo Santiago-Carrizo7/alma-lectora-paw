@@ -11,9 +11,11 @@ interface BooksPageProps {
     books: Book[];
     filters?: CatalogFilters;
     genres?: string[];
+    authors?: string[];
+    bestSellerIds?: string[];
 }
 
-export default function BooksPage({ books = [], filters = {}, genres = [] }: BooksPageProps) {
+export default function BooksPage({ books = [], filters = {}, genres = [], authors = [], bestSellerIds = [] }: BooksPageProps) {
     const applyFilters = (newFilters: Partial<CatalogFilters>) => {
         const merged = {
             ...filters,
@@ -24,6 +26,7 @@ export default function BooksPage({ books = [], filters = {}, genres = [] }: Boo
         if (merged.search && merged.search.trim()) cleanParams.search = merged.search.trim();
         if (merged.genre && merged.genre.trim()) cleanParams.genre = merged.genre.trim();
         if (merged.badge && merged.badge.trim()) cleanParams.badge = merged.badge.trim();
+        if (merged.author && merged.author.trim()) cleanParams.author = merged.author.trim();
 
         router.get('/libros', cleanParams, {
             preserveState: true,
@@ -44,13 +47,17 @@ export default function BooksPage({ books = [], filters = {}, genres = [] }: Boo
         applyFilters({ badge: badge || undefined });
     };
 
+    const handleSelectAuthor = (author: string | undefined) => {
+        applyFilters({ author: author || undefined });
+    };
+
     const handleViewMoreBadge = (badge: string) => {
-        applyFilters({ badge, genre: undefined });
+        applyFilters({ badge, genre: undefined, author: undefined });
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
     const handleViewMoreGenre = (genre: string) => {
-        applyFilters({ genre, badge: undefined });
+        applyFilters({ genre, badge: undefined, author: undefined });
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
@@ -58,11 +65,22 @@ export default function BooksPage({ books = [], filters = {}, genres = [] }: Boo
         router.get('/libros', {}, { preserveState: true, preserveScroll: true, replace: true });
     };
 
-    const isFiltered = Boolean(filters.search || filters.genre || filters.badge);
+    const isFiltered = Boolean(filters.search || filters.genre || filters.badge || filters.author);
 
-    const bestSellers = books.filter((b) => b.badge === 'Más vendido');
-    const novelties = books.filter((b) => b.badge === 'Novedad' || b.badge === 'Destacado');
-    const otherBooks = books.filter((b) => b.badge !== 'Más vendido' && b.badge !== 'Novedad' && b.badge !== 'Destacado');
+    const bestSellers =
+        bestSellerIds && bestSellerIds.length > 0
+            ? books
+                  .filter((b) => bestSellerIds.includes(b.id))
+                  .sort((a, b) => bestSellerIds.indexOf(a.id) - bestSellerIds.indexOf(b.id))
+                  .map((b) => ({ ...b, badge: 'Más vendido' }))
+            : books.filter((b) => b.badge === 'Más vendido');
+
+    const bestSellerIdSet = new Set(bestSellers.map((b) => b.id));
+    const featuredBooks = books.filter((b) => b.badge === 'Destacado');
+    const novelties = books.filter((b) => b.badge === 'Novedad');
+    const otherBooks = books.filter(
+        (b) => !bestSellerIdSet.has(b.id) && b.badge !== 'Más vendido' && b.badge !== 'Novedad' && b.badge !== 'Destacado',
+    );
 
     const byGenre = otherBooks.reduce(
         (acc, book) => {
@@ -92,14 +110,17 @@ export default function BooksPage({ books = [], filters = {}, genres = [] }: Boo
                     </p>
                 </div>
 
-                <div className="flex flex-col items-center gap-2">
+                <div className="flex flex-col items-center gap-3">
                     <SearchBar value={filters.search || ''} onChange={handleSearchChange} />
                     <FilterChips
                         genres={genres}
+                        authors={authors}
                         selectedGenre={filters.genre}
                         selectedBadge={filters.badge}
+                        selectedAuthor={filters.author}
                         onSelectGenre={handleSelectGenre}
                         onSelectBadge={handleSelectBadge}
+                        onSelectAuthor={handleSelectAuthor}
                         onClearAll={handleClearAll}
                     />
                 </div>
@@ -166,7 +187,7 @@ export default function BooksPage({ books = [], filters = {}, genres = [] }: Boo
                                     </div>
                                     <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-6 lg:grid-cols-4">
                                         {visible.map((book) => (
-                                            <BookCard key={book.id} book={book} />
+                                            <BookCard key={book.id} book={book} hideSectionBadge="Más vendido" />
                                         ))}
                                     </div>
                                     {showMore && (
@@ -184,13 +205,51 @@ export default function BooksPage({ books = [], filters = {}, genres = [] }: Boo
                             );
                         })()}
 
+                        {featuredBooks.length > 0 && (() => {
+                            const { visible, showMore } = getSectionSlice(featuredBooks, 4, 2);
+                            return (
+                                <div className="space-y-4">
+                                    <div className="border-paper-dark/80 flex items-center justify-between border-b pb-2">
+                                        <h2 className="text-ink flex items-center gap-2 font-serif text-xl font-bold tracking-tight">
+                                            <span>⭐</span> Destacados
+                                        </h2>
+                                        {showMore && (
+                                            <button
+                                                type="button"
+                                                onClick={() => handleViewMoreBadge('Destacado')}
+                                                className="text-forest hover:text-forest-light cursor-pointer text-xs font-semibold tracking-wide transition-colors hover:underline"
+                                            >
+                                                Ver más ({featuredBooks.length}) &rarr;
+                                            </button>
+                                        )}
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-6 lg:grid-cols-4">
+                                        {visible.map((book) => (
+                                            <BookCard key={book.id} book={book} hideSectionBadge="Destacado" />
+                                        ))}
+                                    </div>
+                                    {showMore && (
+                                        <div className="flex justify-end pt-1">
+                                            <button
+                                                type="button"
+                                                onClick={() => handleViewMoreBadge('Destacado')}
+                                                className="text-forest hover:text-forest-light flex cursor-pointer items-center gap-1 text-xs font-semibold transition-colors hover:underline"
+                                            >
+                                                Ver todos los destacados ({featuredBooks.length}) &rarr;
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })()}
+
                         {novelties.length > 0 && (() => {
                             const { visible, showMore } = getSectionSlice(novelties, 4, 2);
                             return (
                                 <div className="space-y-4">
                                     <div className="border-paper-dark/80 flex items-center justify-between border-b pb-2">
                                         <h2 className="text-ink flex items-center gap-2 font-serif text-xl font-bold tracking-tight">
-                                            <span>✨</span> Novedades y Recomendados
+                                            <span>✨</span> Novedades
                                         </h2>
                                         {showMore && (
                                             <button
@@ -204,7 +263,7 @@ export default function BooksPage({ books = [], filters = {}, genres = [] }: Boo
                                     </div>
                                     <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-6 lg:grid-cols-4">
                                         {visible.map((book) => (
-                                            <BookCard key={book.id} book={book} />
+                                            <BookCard key={book.id} book={book} hideSectionBadge="Novedad" />
                                         ))}
                                     </div>
                                     {showMore && (

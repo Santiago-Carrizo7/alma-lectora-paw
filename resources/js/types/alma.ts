@@ -35,6 +35,7 @@ export interface CatalogFilters {
     search?: string;
     genre?: string;
     badge?: string;
+    author?: string;
 }
 
 export interface PaginationLink {
@@ -137,12 +138,6 @@ export interface StoreConfig {
     whatsappPhone?: string;
     instagram_url: string;
     instagramUrl?: string;
-    shipping_cost: string | number;
-    shippingCost?: string | number;
-    free_shipping_min: string | number;
-    freeShippingMin?: string | number;
-    banner_message?: string | null;
-    bannerMessage?: string | null;
     is_store_open: boolean;
     isStoreOpen?: boolean;
     created_at?: string;

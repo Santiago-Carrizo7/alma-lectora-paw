@@ -10,6 +10,7 @@ import type { Accessory, Book, Combo } from '../../types/alma';
 
 interface HomePageProps {
     bestSellers: Book[];
+    featuredBooks?: Book[];
     novelties: Book[];
     combos?: Combo[];
     featuredAccessories: Accessory[];
@@ -18,7 +19,7 @@ interface HomePageProps {
 interface SectionWrapperProps {
     title: string;
     subtitle: string;
-    viewAllLink: string;
+    viewAllLink?: string;
     mobileGrid: React.ReactNode;
     desktopCarousel: React.ReactNode;
 }
@@ -31,12 +32,14 @@ function SectionWrapper({ title, subtitle, viewAllLink, mobileGrid, desktopCarou
                     <h2 className="text-ink font-serif text-xl font-bold tracking-tight sm:text-2xl">{title}</h2>
                     <p className="mt-0.5 text-xs text-stone-500 sm:mt-1">{subtitle}</p>
                 </div>
-                <Link
-                    href={viewAllLink}
-                    className="text-forest hover:text-forest-light shrink-0 pt-1 text-xs font-semibold tracking-wider uppercase underline whitespace-nowrap"
-                >
-                    Ver Todos
-                </Link>
+                {viewAllLink && (
+                    <Link
+                        href={viewAllLink}
+                        className="text-forest hover:text-forest-light shrink-0 pt-1 text-xs font-semibold tracking-wider uppercase underline whitespace-nowrap"
+                    >
+                        Ver Todos
+                    </Link>
+                )}
             </div>
 
             <div className="block sm:hidden">
@@ -50,7 +53,7 @@ function SectionWrapper({ title, subtitle, viewAllLink, mobileGrid, desktopCarou
     );
 }
 
-export function HomePage({ bestSellers = [], novelties = [], combos = [], featuredAccessories = [] }: HomePageProps) {
+export function HomePage({ bestSellers = [], featuredBooks = [], novelties = [], combos = [], featuredAccessories = [] }: HomePageProps) {
     return (
         <PageShell>
             <Head title="Inicio" />
@@ -66,7 +69,7 @@ export function HomePage({ bestSellers = [], novelties = [], combos = [], featur
                             historias que perduran.
                         </h1>
                         <p className="text-ink-muted max-w-lg font-sans text-sm leading-relaxed sm:text-base">
-                            Explorá nuestra selección curada de libros y accesorios premium. Armá tu pedido, ingresá tus datos de entrega y finalizá la compra directamente con nosotros por WhatsApp.
+                            Explorá nuestra selección especial de libros y accesorios. Armá tu pedido, ingresá tus datos de entrega y finalizá la compra directamente con nosotros por WhatsApp.
                         </p>
                         <div className="flex flex-wrap justify-center gap-3 pt-2 sm:justify-start">
                             <Link href="/libros">
@@ -92,11 +95,11 @@ export function HomePage({ bestSellers = [], novelties = [], combos = [], featur
                         <SectionWrapper
                             title="Lo Más Vendido"
                             subtitle="Los favoritos indiscutidos de nuestra comunidad."
-                            viewAllLink="/libros"
+                            viewAllLink="/libros?badge=M%C3%A1s%20vendido"
                             mobileGrid={
                                 <div className="grid grid-cols-2 gap-3 sm:gap-4">
                                     {bestSellers.slice(0, 4).map((book) => (
-                                        <BookCard key={book.id} book={book} />
+                                        <BookCard key={book.id} book={book} hideSectionBadge="Más vendido" />
                                     ))}
                                 </div>
                             }
@@ -104,7 +107,31 @@ export function HomePage({ bestSellers = [], novelties = [], combos = [], featur
                                 <HorizontalScrollCarousel>
                                     {bestSellers.map((book) => (
                                         <div key={book.id} className="w-52 min-w-0 shrink-0 snap-start sm:w-60">
-                                            <BookCard book={book} />
+                                            <BookCard book={book} hideSectionBadge="Más vendido" />
+                                        </div>
+                                    ))}
+                                </HorizontalScrollCarousel>
+                            }
+                        />
+                    )}
+
+                    {featuredBooks.length > 0 && (
+                        <SectionWrapper
+                            title="Destacados"
+                            subtitle="Nuestra selección especial recomendada para vos."
+                            viewAllLink="/libros?badge=Destacado"
+                            mobileGrid={
+                                <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                                    {featuredBooks.slice(0, 4).map((book) => (
+                                        <BookCard key={book.id} book={book} hideSectionBadge="Destacado" />
+                                    ))}
+                                </div>
+                            }
+                            desktopCarousel={
+                                <HorizontalScrollCarousel>
+                                    {featuredBooks.map((book) => (
+                                        <div key={book.id} className="w-52 min-w-0 shrink-0 snap-start sm:w-60">
+                                            <BookCard book={book} hideSectionBadge="Destacado" />
                                         </div>
                                     ))}
                                 </HorizontalScrollCarousel>
@@ -116,11 +143,11 @@ export function HomePage({ bestSellers = [], novelties = [], combos = [], featur
                         <SectionWrapper
                             title="Novedades"
                             subtitle="Los últimos títulos incorporados a nuestra biblioteca."
-                            viewAllLink="/libros"
+                            viewAllLink="/libros?badge=Novedad"
                             mobileGrid={
                                 <div className="grid grid-cols-2 gap-3 sm:gap-4">
                                     {novelties.slice(0, 4).map((book) => (
-                                        <BookCard key={book.id} book={book} />
+                                        <BookCard key={book.id} book={book} hideSectionBadge="Novedad" />
                                     ))}
                                 </div>
                             }
@@ -128,7 +155,7 @@ export function HomePage({ bestSellers = [], novelties = [], combos = [], featur
                                 <HorizontalScrollCarousel>
                                     {novelties.map((book) => (
                                         <div key={book.id} className="w-52 min-w-0 shrink-0 snap-start sm:w-60">
-                                            <BookCard book={book} />
+                                            <BookCard book={book} hideSectionBadge="Novedad" />
                                         </div>
                                     ))}
                                 </HorizontalScrollCarousel>
@@ -140,11 +167,10 @@ export function HomePage({ bestSellers = [], novelties = [], combos = [], featur
                         <SectionWrapper
                             title="Combos Literarios"
                             subtitle="Ahorrá llevando paquetes combinados con ofertas únicas."
-                            viewAllLink="/"
                             mobileGrid={
                                 <div className="grid grid-cols-1 gap-4 min-[480px]:grid-cols-2">
                                     {combos.slice(0, 4).map((combo) => (
-                                        <ComboCard key={combo.id} combo={combo} />
+                                        <ComboCard key={combo.id} combo={combo} hideSectionBadge />
                                     ))}
                                 </div>
                             }
@@ -152,7 +178,7 @@ export function HomePage({ bestSellers = [], novelties = [], combos = [], featur
                                 <HorizontalScrollCarousel>
                                     {combos.map((combo) => (
                                         <div key={combo.id} className="w-72 min-w-0 shrink-0 snap-start sm:w-80">
-                                            <ComboCard combo={combo} />
+                                            <ComboCard combo={combo} hideSectionBadge />
                                         </div>
                                     ))}
                                 </HorizontalScrollCarousel>

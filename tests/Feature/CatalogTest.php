@@ -28,6 +28,7 @@ class CatalogTest extends TestCase
             ->has('books')
             ->has('filters')
             ->has('genres')
+            ->has('authors')
         );
     }
 
@@ -40,6 +41,26 @@ class CatalogTest extends TestCase
             ->component('Catalog/BooksPage')
             ->where('filters.search', 'Boulevard')
             ->has('books')
+        );
+    }
+
+    public function test_catalog_can_be_filtered_by_author(): void
+    {
+        $author = Author::whereHas('books', fn ($q) => $q->active())->first();
+        $this->assertNotNull($author);
+
+        $response = $this->get('/libros?author=' . urlencode($author->name));
+
+        $response->assertStatus(200);
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('Catalog/BooksPage')
+            ->where('filters.author', $author->name)
+            ->has('books', fn (Assert $books) => $books
+                ->each(fn (Assert $book) => $book
+                    ->where('authors.0.name', fn ($name) => is_string($name))
+                    ->etc()
+                )
+            )
         );
     }
 
@@ -56,5 +77,16 @@ class CatalogTest extends TestCase
             ->where('book.id', $book->id)
             ->has('book.authors')
         );
+    }
+
+    public function test_inactive_book_returns_404_for_public_and_200_for_admin(): void
+    {
+        $book = Book::first();
+        $book->update(['is_active' => false]);
+
+        $this->get("/libros/{$book->id}")->assertStatus(404);
+
+        $admin = \App\Models\User::factory()->admin()->create();
+        $this->actingAs($admin)->get("/libros/{$book->id}")->assertStatus(200);
     }
 }

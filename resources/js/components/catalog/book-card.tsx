@@ -10,14 +10,75 @@ import { ButtonEditorial } from '../ui/button-editorial';
 interface BookCardProps {
     book: Book;
     onAddToCart?: (book: Book) => void;
+    hideSectionBadge?: string;
 }
 
-export const BookCard = React.memo(function BookCard({ book, onAddToCart }: BookCardProps) {
-    const { addItem, openCart } = useCart();
+export const BookCard = React.memo(function BookCard({ book, onAddToCart, hideSectionBadge }: BookCardProps) {
+    const { addItem } = useCart();
+    const [added, setAdded] = React.useState(false);
     const isOutOfStock = book.stock === 0;
     const cover = book.coverUrl || book.cover_url;
     const promoQty = book.promoQuantity || book.promo_quantity;
     const promoPrc = book.promoPrice || book.promo_price;
+
+    const shouldShowBookBadge =
+        Boolean(book.badge) &&
+        (!hideSectionBadge || book.badge!.trim().toLowerCase() !== hideSectionBadge.trim().toLowerCase());
+
+    const lowStockLabel = book.stock === 1 ? '¡Última unidad!' : `¡Últimas ${book.stock} unidades!`;
+
+    const topLeftPills: Array<{ key: string; label: string; node: React.ReactNode }> = [];
+    if (isOutOfStock) {
+        topLeftPills.push({
+            key: 'agotado',
+            label: 'Agotado',
+            node: <BadgeEditorial key="agotado" variant="agotado" label="Agotado" />,
+        });
+    } else {
+        if (book.stock <= 2) {
+            topLeftPills.push({
+                key: 'stock',
+                label: lowStockLabel,
+                node: (
+                    <span
+                        key="stock"
+                        className="rounded-sm bg-amber-600 px-2 py-0.5 text-[10px] font-extrabold tracking-wide whitespace-nowrap text-white shadow-xs"
+                    >
+                        {lowStockLabel}
+                    </span>
+                ),
+            });
+        }
+        if (promoQty && promoPrc) {
+            const promoLabel = `${promoQty}x${formatPrice(promoPrc)}`;
+            topLeftPills.push({
+                key: 'promo',
+                label: promoLabel,
+                node: (
+                    <div
+                        key="promo"
+                        className="bg-forest border-amber/40 rounded-sm border px-2 py-0.5 text-[10px] font-extrabold tracking-wide whitespace-nowrap text-stone-100 shadow-xs"
+                    >
+                        <span>{promoLabel}</span>
+                    </div>
+                ),
+            });
+        }
+        if (shouldShowBookBadge && book.badge) {
+            topLeftPills.push({
+                key: 'badge',
+                label: book.badge,
+                node: (
+                    <BadgeEditorial
+                        key="badge"
+                        variant={book.badge.toLowerCase().includes('oferta') ? 'oferta' : 'custom'}
+                        label={book.badge}
+                    />
+                ),
+            });
+        }
+    }
+    topLeftPills.sort((a, b) => b.label.length - a.label.length);
 
     const authorNames = book.authors && book.authors.length > 0 ? book.authors.map((a) => a.name).join(', ') : 'Autor Desconocido';
 
@@ -39,7 +100,8 @@ export const BookCard = React.memo(function BookCard({ book, onAddToCart }: Book
                 promoPrice: promoPrc,
                 stock: book.stock,
             });
-            openCart();
+            setAdded(true);
+            setTimeout(() => setAdded(false), 1200);
         }
     };
 
@@ -78,20 +140,12 @@ export const BookCard = React.memo(function BookCard({ book, onAddToCart }: Book
                         </>
                     )}
 
-                    {/* Badges Overlay */}
-                    <div className="absolute top-2.5 left-2.5 z-10 flex max-w-[85%] flex-col gap-1.5">
-                        {isOutOfStock && <BadgeEditorial variant="agotado" label="Agotado" />}
-                        {!isOutOfStock && promoQty && promoPrc && (
-                            <div className="bg-forest border-amber/40 rounded-sm border px-2 py-0.5 text-[10px] font-extrabold tracking-wide text-stone-100 shadow-xs">
-                                <span>
-                                    {promoQty}x{formatPrice(promoPrc)}
-                                </span>
-                            </div>
-                        )}
-                        {!isOutOfStock && book.badge && (
-                            <BadgeEditorial variant={book.badge.toLowerCase().includes('oferta') ? 'oferta' : 'custom'} label={book.badge} />
-                        )}
-                    </div>
+                    {/* Badges Overlay (ordered widest-first on top-left) */}
+                    {topLeftPills.length > 0 && (
+                        <div className="absolute top-2.5 left-2.5 z-10 flex max-w-[88%] flex-col items-start gap-1.5">
+                            {topLeftPills.map((pill) => pill.node)}
+                        </div>
+                    )}
                 </div>
 
                 {/* Book details */}
@@ -114,10 +168,10 @@ export const BookCard = React.memo(function BookCard({ book, onAddToCart }: Book
                             size="sm"
                             onClick={handleAddToCart}
                             disabled={isOutOfStock}
-                            aria-label={isOutOfStock ? `${book.title} está agotado` : `Ver detalles de ${book.title}`}
+                            aria-label={isOutOfStock ? `${book.title} está agotado` : `Agregar ${book.title} al carrito`}
                             className="px-3 py-1.5 text-xs font-semibold"
                         >
-                            {isOutOfStock ? 'Agotado' : 'Agregar'}
+                            {isOutOfStock ? 'Agotado' : added ? '¡Agregado! ✓' : 'Agregar'}
                         </ButtonEditorial>
                     </div>
                 </div>
