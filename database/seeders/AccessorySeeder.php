@@ -48,12 +48,14 @@ class AccessorySeeder extends Seeder
 
                 $catSlug = $acc['category'] ?? null;
                 $catId = AccessoryCategory::where('slug', $catSlug)
-                    ->orWhere('id', $catSlug)
+                    ->when(\Illuminate\Support\Str::isUuid((string) $catSlug), fn ($q) => $q->orWhere('id', $catSlug))
                     ->value('id');
 
                 if (!$catId) {
                     $catId = AccessoryCategory::first()?->id;
                 }
+
+                $existing = Accessory::withTrashed()->find($acc['id']);
 
                 Accessory::updateOrCreate(
                     ['id' => $acc['id']],
@@ -63,7 +65,7 @@ class AccessorySeeder extends Seeder
                         'price' => $acc['price'] ?? 0,
                         'promo_quantity' => $acc['promoQuantity'] ?? null,
                         'promo_price' => $acc['promoPrice'] ?? null,
-                        'stock' => $variedStock,
+                        'stock' => $existing ? $existing->stock : $variedStock,
                         'category_id' => $catId,
                         'cover_url' => $acc['coverUrl'] ?? null,
                         'additional_images' => $acc['additionalImages'] ?? [],

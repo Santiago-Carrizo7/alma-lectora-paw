@@ -4,9 +4,13 @@ namespace Tests\Feature;
 
 use App\Models\Author;
 use App\Models\Book;
+use App\Models\Combo;
+use App\Models\ComboBook;
 use App\Models\User;
 use Database\Seeders\BookSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -242,5 +246,110 @@ class AdminBookTest extends TestCase
         $response->assertSessionHas('success');
         $book->refresh();
         $this->assertEquals(!$initialStatus, $book->is_active);
+    }
+
+    public function test_admin_cannot_force_delete_book_that_belongs_to_a_combo(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $book = Book::first();
+        $combo = Combo::create([
+            'title' => 'Combo Protegido',
+            'price' => 25000,
+            'stock' => 3,
+            'is_active' => true,
+        ]);
+        ComboBook::create([
+            'combo_id' => $combo->id,
+            'book_id' => $book->id,
+            'quantity' => 1,
+        ]);
+
+        $response = $this->actingAs($admin)->delete("/admin/libros/{$book->id}/forzar");
+
+        $response->assertSessionHas('error');
+        $this->assertDatabaseHas('books', ['id' => $book->id]);
+        $this->assertDatabaseHas('combo_books', ['combo_id' => $combo->id, 'book_id' => $book->id]);
+    }
+
+    public function test_admin_can_upload_replace_delete_local_images_and_enforce_additional_images_limit(): void
+    {
+        Storage::fake('public');
+        $admin = User::factory()->admin()->create();
+
+        // Upload two local images
+        $upload1 = $this->actingAs($admin)->postJson('/admin/upload-image', [
+            'image' => UploadedFile::fake()->image('cover1.png', 200, 300),
+        ]);
+        $upload1->assertOk();
+        $url1 = $upload1->json('url');
+        $this->assertStringStartsWith('/storage/uploads/', $url1);
+        Storage::disk('public')->assertExists(str_replace('/storage/', '', $url1));
+
+        $upload2 = $this->actingAs($admin)->postJson('/admin/upload-image', [
+            'image' => UploadedFile::fake()->image('cover2.png', 200, 300),
+        ]);
+        $upload2->assertOk();
+        $url2 = $upload2->json('url');
+
+        // Store book with url1
+        $this->actingAs($admin)->post('/admin/libros', [
+            'isbn' => '9789870099881',
+            'title' => 'Libro con Portada Local',
+            'price' => 18000,
+            'stock' => 5,
+            'cover_url' => $url1,
+            'additional_images' => [$url2],
+            'is_active' => true,
+            'authors' => [],
+        ])->assertRedirect('/admin/libros');
+
+        $book = Book::where('isbn', '9789870099881')->firstOrFail();
+
+        // Reject deleting still-referenced upload via endpoint
+        $this->actingAs($admin)->deleteJson('/admin/upload-image', ['url' => $url1])
+            ->assertOk()
+            ->assertJson(['deleted' => false]);
+        Storage::disk('public')->assertExists(str_replace('/storage/', '', $url1));
+
+        // Reject path traversal
+        $this->actingAs($admin)->deleteJson('/admin/upload-image', ['url' => '/storage/uploads/../secret.png'])
+            ->assertStatus(422);
+
+        // Enforce max:3 additional_images
+        $this->actingAs($admin)->put("/admin/libros/{$book->id}", [
+            'isbn' => $book->isbn,
+            'title' => $book->title,
+            'price' => 18000,
+            'stock' => 5,
+            'cover_url' => $url1,
+            'additional_images' => ['a.jpg', 'b.jpg', 'c.jpg', 'd.jpg'],
+            'is_active' => true,
+            'authors' => [],
+        ])->assertSessionHasErrors(['additional_images']);
+
+        // Replacing cover_url with url2 cleans up orphaned url1
+        $this->actingAs($admin)->put("/admin/libros/{$book->id}", [
+            'isbn' => $book->isbn,
+            'title' => $book->title,
+            'price' => 18000,
+            'stock' => 5,
+            'cover_url' => $url2,
+            'additional_images' => [],
+            'is_active' => true,
+            'authors' => [],
+        ])->assertRedirect('/admin/libros');
+
+        Storage::disk('public')->assertMissing(str_replace('/storage/', '', $url1));
+        Storage::disk('public')->assertExists(str_replace('/storage/', '', $url2));
+
+        // Unreferenced upload can be deleted explicitly
+        $upload3 = $this->actingAs($admin)->postJson('/admin/upload-image', [
+            'image' => UploadedFile::fake()->image('temp.png', 100, 100),
+        ])->assertOk();
+        $url3 = $upload3->json('url');
+        $this->actingAs($admin)->deleteJson('/admin/upload-image', ['url' => $url3])
+            ->assertOk()
+            ->assertJson(['deleted' => true]);
+        Storage::disk('public')->assertMissing(str_replace('/storage/', '', $url3));
     }
 }

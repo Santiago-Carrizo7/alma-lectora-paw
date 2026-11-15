@@ -29,6 +29,7 @@ class UserFactory extends Factory
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
+            'is_active' => true,
         ];
     }
 
@@ -47,7 +48,28 @@ class UserFactory extends Factory
         return $this->state(fn (array $attributes) => [
             'role' => 'admin',
             'is_active' => true,
-        ]);
+        ])->afterCreating(function (\App\Models\User $user): void {
+            app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+
+            $roleAdmin = \Spatie\Permission\Models\Role::firstOrCreate([
+                'name' => 'admin',
+                'guard_name' => 'web',
+            ]);
+
+            if ($roleAdmin->permissions()->count() === 0) {
+                foreach (\Database\Seeders\RolesAndPermissionsSeeder::ADMIN_PERMISSIONS as $permName) {
+                    \Spatie\Permission\Models\Permission::firstOrCreate([
+                        'name' => $permName,
+                        'guard_name' => 'web',
+                    ]);
+                }
+                $roleAdmin->syncPermissions(\Database\Seeders\RolesAndPermissionsSeeder::ADMIN_PERMISSIONS);
+            }
+
+            if (! $user->hasRole('admin')) {
+                $user->assignRole($roleAdmin);
+            }
+        });
     }
 
     public function client(): static

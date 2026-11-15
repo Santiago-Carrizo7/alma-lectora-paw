@@ -55,7 +55,7 @@ class CustomerOrdersTest extends TestCase
         $client = User::where('email', 'cliente@almalectora.com')->first();
         $this->actingAs($client);
 
-        $book = Book::active()->first();
+        $book = Book::active()->where('stock', '>', 0)->first();
 
         $payload = [
             'customer_name' => $client->name,
@@ -89,7 +89,7 @@ class CustomerOrdersTest extends TestCase
 
     public function test_guest_checkout_persists_null_user_id(): void
     {
-        $book = Book::active()->first();
+        $book = Book::active()->where('stock', '>', 0)->first();
 
         $payload = [
             'customer_name' => 'Invitado Comprador',
@@ -174,9 +174,10 @@ class CustomerOrdersTest extends TestCase
         $response = $this->get("/mis-compras/{$orderB->id}/remito");
         $response->assertStatus(403);
 
-        // Client B descarga su propio remito -> 200 OK
+        // Client B descarga su propio remito -> 200 OK y nombre remito-orden-*
         $this->actingAs($clientB);
         $responseB = $this->get("/mis-compras/{$orderB->id}/remito");
         $responseB->assertStatus(200);
+        $this->assertStringContainsString('remito-orden-', (string) $responseB->headers->get('content-disposition'));
     }
 }

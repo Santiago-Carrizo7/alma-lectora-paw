@@ -50,6 +50,8 @@ class BookSeeder extends Seeder
                     default => 6,    // Stock regular
                 };
 
+                $existing = Book::withTrashed()->find($item['id']);
+
                 Book::updateOrCreate(
                     ['id' => $item['id']],
                     [
@@ -65,7 +67,7 @@ class BookSeeder extends Seeder
                         'price' => $item['price'] ?? 0,
                         'promo_quantity' => $item['promoQuantity'] ?? null,
                         'promo_price' => $item['promoPrice'] ?? null,
-                        'stock' => $variedStock,
+                        'stock' => $existing ? $existing->stock : $variedStock,
                         'badge' => $item['badge'] ?? null,
                         'genre' => $item['genre'] ?? null,
                         'is_active' => $item['isActive'] ?? true,
@@ -302,13 +304,15 @@ class BookSeeder extends Seeder
 
             $coverUrl = "https://covers.openlibrary.org/b/isbn/{$item['isbn']}-L.jpg";
 
+            $existingFallback = Book::withTrashed()->where('isbn', $item['isbn'])->first();
+
             $book = Book::updateOrCreate(
                 ['isbn' => $item['isbn']],
                 [
                     'title' => $item['title'],
                     'original_title' => $item['title'],
                     'price' => $item['price'],
-                    'stock' => $item['stock'],
+                    'stock' => $existingFallback ? $existingFallback->stock : $item['stock'],
                     'badge' => $item['badge'],
                     'genre' => $item['genre'],
                     'synopsis' => $item['synopsis'],

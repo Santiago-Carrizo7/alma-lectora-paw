@@ -11,6 +11,36 @@ use Spatie\Permission\PermissionRegistrar;
 
 class RolesAndPermissionsSeeder extends Seeder
 {
+    public const ADMIN_PERMISSIONS = [
+        'ver dashboard',
+        'listar libros',
+        'crear libros',
+        'ver libros',
+        'editar libros',
+        'eliminar libros',
+        'exportar libros',
+        'listar accesorios',
+        'crear accesorios',
+        'ver accesorios',
+        'editar accesorios',
+        'eliminar accesorios',
+        'exportar accesorios',
+        'listar combos',
+        'crear combos',
+        'ver combos',
+        'editar combos',
+        'eliminar combos',
+        'exportar combos',
+        'listar pedidos',
+        'ver pedidos',
+        'actualizar estado pedidos',
+        'eliminar pedidos',
+        'descargar remitos',
+        'ver reportes estadisticos',
+        'descargar reportes',
+        'gestionar configuracion tienda',
+    ];
+
     /**
      * Run the database seeds.
      */
@@ -89,35 +119,7 @@ class RolesAndPermissionsSeeder extends Seeder
         $roleSuperAdmin->syncPermissions(Permission::all());
 
         // Admin gestiona catálogo, pedidos, configuración y reportes (sin acceso a usuarios/roles)
-        $roleAdmin->syncPermissions([
-            'ver dashboard',
-            'listar libros',
-            'crear libros',
-            'ver libros',
-            'editar libros',
-            'eliminar libros',
-            'exportar libros',
-            'listar accesorios',
-            'crear accesorios',
-            'ver accesorios',
-            'editar accesorios',
-            'eliminar accesorios',
-            'exportar accesorios',
-            'listar combos',
-            'crear combos',
-            'ver combos',
-            'editar combos',
-            'eliminar combos',
-            'exportar combos',
-            'listar pedidos',
-            'ver pedidos',
-            'actualizar estado pedidos',
-            'eliminar pedidos',
-            'descargar remitos',
-            'ver reportes estadisticos',
-            'descargar reportes',
-            'gestionar configuracion tienda',
-        ]);
+        $roleAdmin->syncPermissions(self::ADMIN_PERMISSIONS);
 
         // Client puede consultar sus compras y descargar sus remitos
         $roleClient->syncPermissions([
@@ -131,6 +133,15 @@ class RolesAndPermissionsSeeder extends Seeder
             'ver libros',
             'listar accesorios',
             'ver accesorios',
+        ]);
+
+        // Rol personalizado de prueba para demostración y defensa ante profesores
+        $rolePrueba = Role::firstOrCreate(['name' => 'rol de prueba', 'guard_name' => 'web']);
+        $rolePrueba->syncPermissions([
+            'listar libros',
+            'ver libros',
+            'exportar libros',
+            'listar accesorios',
         ]);
 
         // 4. Crear Usuarios de prueba

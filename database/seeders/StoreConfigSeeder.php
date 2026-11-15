@@ -30,9 +30,6 @@ class StoreConfigSeeder extends Seeder
                     [
                         'whatsapp_phone' => $cfg['whatsappPhone'] ?? $cfg['whatsapp_phone'] ?? '5493875708557',
                         'instagram_url' => $cfg['instagramUrl'] ?? $cfg['instagram_url'] ?? 'https://www.instagram.com/alma.lectora.al/?hl=es-la',
-                        'shipping_cost' => $cfg['shippingCost'] ?? $cfg['shipping_cost'] ?? 0.00,
-                        'free_shipping_min' => $cfg['freeShippingMin'] ?? $cfg['free_shipping_min'] ?? 0.00,
-                        'banner_message' => $cfg['bannerMessage'] ?? $cfg['banner_message'] ?? null,
                         'is_store_open' => $cfg['isStoreOpen'] ?? $cfg['is_store_open'] ?? true,
                     ]
                 );
@@ -47,9 +44,6 @@ class StoreConfigSeeder extends Seeder
             ['whatsapp_phone' => '5493875708557'],
             [
                 'instagram_url' => 'https://www.instagram.com/alma.lectora.al/?hl=es-la',
-                'shipping_cost' => 0.00,
-                'free_shipping_min' => 0.00,
-                'banner_message' => null,
                 'is_store_open' => true,
             ]
         );

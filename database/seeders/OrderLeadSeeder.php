@@ -24,6 +24,18 @@ class OrderLeadSeeder extends Seeder
             $leads = $tables['orderLeads'] ?? [];
 
             foreach ($leads as $lead) {
+                $normalizedItems = array_map(function ($item) {
+                    $qty = max(1, (int) ($item['quantity'] ?? 1));
+                    $unitPrice = (float) ($item['unit_price'] ?? $item['price'] ?? $item['unitPrice'] ?? 0);
+
+                    $item['unit_price'] = $unitPrice;
+                    $item['subtotal'] = isset($item['subtotal'])
+                        ? (float) $item['subtotal']
+                        : round($unitPrice * $qty, 2);
+
+                    return $item;
+                }, is_array($lead['items'] ?? null) ? $lead['items'] : []);
+
                 OrderLead::updateOrCreate(
                     ['id' => $lead['id']],
                     [
@@ -33,7 +45,7 @@ class OrderLeadSeeder extends Seeder
                         'customer_dni' => $lead['customerDni'] ?? null,
                         'postal_code' => $lead['postalCode'] ?? null,
                         'address' => $lead['address'] ?? null,
-                        'items' => $lead['items'] ?? [],
+                        'items' => $normalizedItems,
                         'total_amount' => $lead['totalAmount'] ?? 0,
                         'status' => $lead['status'] ?? 'PENDING_WHATSAPP',
                         'created_at' => $lead['createdAt'] ?? now(),
@@ -342,28 +354,37 @@ class OrderLeadSeeder extends Seeder
             ],
         ];
 
-        // Insertar las órdenes calculando total_amount automáticamente
-        foreach ($orders as $orderData) {
+        // Insertar órdenes simuladas de forma idempotente (representan un snapshot comercial;
+        // el stock inicial sembrado por BookSeeder/AccessorySeeder ya refleja el estado resultante).
+        foreach ($orders as $idx => $orderData) {
             $filteredItems = array_values(array_filter($orderData['items'] ?? []));
             $totalAmount = 0.0;
             foreach ($filteredItems as $item) {
                 $totalAmount += ((float) $item['unit_price']) * ((int) $item['quantity']);
             }
 
-            OrderLead::create([
-                'user_id' => $orderData['user_id'],
-                'customer_name' => $orderData['customer_name'],
-                'customer_email' => $orderData['customer_email'],
-                'customer_dni' => $orderData['customer_dni'],
-                'customer_phone' => $orderData['customer_phone'],
-                'postal_code' => $orderData['postal_code'],
-                'address' => $orderData['address'],
-                'items' => $filteredItems,
-                'total_amount' => $totalAmount,
-                'status' => $orderData['status'],
+            $seedId = sprintf('00000000-0000-4000-8000-%012d', 1000 + $idx);
+
+            $record = OrderLead::updateOrCreate(
+                ['id' => $seedId],
+                [
+                    'user_id' => $orderData['user_id'],
+                    'customer_name' => $orderData['customer_name'],
+                    'customer_email' => $orderData['customer_email'],
+                    'customer_dni' => $orderData['customer_dni'],
+                    'customer_phone' => $orderData['customer_phone'],
+                    'postal_code' => $orderData['postal_code'],
+                    'address' => $orderData['address'],
+                    'items' => $filteredItems,
+                    'total_amount' => $totalAmount,
+                    'status' => $orderData['status'],
+                ]
+            );
+
+            $record->forceFill([
                 'created_at' => $orderData['created_at'],
                 'updated_at' => $orderData['created_at'],
-            ]);
+            ])->saveQuietly();
         }
     }
 }
