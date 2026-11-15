@@ -110,9 +110,37 @@ class AdminUserController extends Controller
         // REGLA CRÍTICA DE ROL: Evitar que un Super Admin se quite el rol a sí mismo
         if ($request->user()->id === $user->id && $user->hasRole('super-admin')) {
             if (!in_array('super-admin', $request->input('roles', []))) {
-                return redirect()->back()->withErrors([
-                    'roles' => 'No puedes quitarte a ti mismo el rol de Super Administrador.',
+                return redirect()->back()
+                    ->with('error', 'No podés quitarte a vos mismo el rol de Super Administrador.')
+                    ->withErrors([
+                        'roles' => 'No podés quitarte a vos mismo el rol de Super Administrador.',
+                    ])->withInput();
+            }
+        }
+
+        if ($request->user()->id === $user->id && !$request->boolean('is_active', true)) {
+            return redirect()->back()
+                ->with('error', 'No podés desactivar tu propia cuenta.')
+                ->withErrors([
+                    'is_active' => 'No podés desactivar tu propia cuenta.',
                 ])->withInput();
+        }
+
+        $rolesInput = $request->input('roles', []);
+        $willBeActive = $request->boolean('is_active', true);
+        $willKeepSuperAdmin = in_array('super-admin', $rolesInput, true);
+
+        // H-21: Never leave the system without at least one active super-admin.
+        if ($user->hasRole('super-admin') && $user->is_active && (! $willKeepSuperAdmin || ! $willBeActive)) {
+            $activeSuperAdminCount = User::role('super-admin')->where('is_active', true)->count();
+            if ($activeSuperAdminCount <= 1) {
+                $errorMsg = 'Debe quedar al menos un Super Administrador activo en el sistema.';
+
+                return redirect()->back()
+                    ->with('error', $errorMsg)
+                    ->withErrors([
+                        ! $willKeepSuperAdmin ? 'roles' : 'is_active' => $errorMsg,
+                    ])->withInput();
             }
         }
 
@@ -123,8 +151,7 @@ class AdminUserController extends Controller
             unset($validated['password']);
         }
 
-        $validated['is_active'] = $request->boolean('is_active', true);
-        $rolesInput = $request->input('roles', []);
+        $validated['is_active'] = $willBeActive;
         $validated['role'] = in_array('super-admin', $rolesInput) || in_array('admin', $rolesInput)
             ? 'admin'
             : 'client';
@@ -137,9 +164,25 @@ class AdminUserController extends Controller
         return redirect()->route('admin.users.index')->with('success', 'Usuario actualizado correctamente.');
     }
 
-    public function destroy(User $user): RedirectResponse
+    public function destroy(Request $request, User $user): RedirectResponse
     {
-        Gate::authorize('delete', $user);
+        if ($request->user()?->id === $user->id) {
+            return redirect()->route('admin.users.index')
+                ->with('error', 'Operación no permitida: no podés eliminar tu propia cuenta de usuario.');
+        }
+
+        if (!Gate::allows('delete', $user)) {
+            return redirect()->route('admin.users.index')
+                ->with('error', 'No tenés permisos para eliminar este usuario.');
+        }
+
+        if ($user->hasRole('super-admin') && $user->is_active) {
+            $activeSuperAdminCount = User::role('super-admin')->where('is_active', true)->count();
+            if ($activeSuperAdminCount <= 1) {
+                return redirect()->route('admin.users.index')
+                    ->with('error', 'Debe quedar al menos un Super Administrador activo en el sistema.');
+            }
+        }
 
         $user->delete();
 

@@ -34,6 +34,9 @@ export function useAuth() {
         can,
         hasRole,
         isSuperAdmin: roles.includes('super-admin'),
-        isAdmin: roles.includes('admin') || roles.includes('super-admin'),
+        isAdmin:
+            roles.includes('super-admin') ||
+            roles.includes('admin') ||
+            (roles.some((r) => r !== 'client' && r !== 'guest') && permissions.length > 0),
     };
 }

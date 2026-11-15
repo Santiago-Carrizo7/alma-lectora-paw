@@ -1,21 +1,28 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 import { QuickStockModal } from '../../../components/admin/quick-stock-modal';
+import { SearchableFilterPopover } from '../../../components/catalog/searchable-filter-popover';
 import { BookThumbnail } from '../../../components/ui/book-thumbnail';
+import { PaginationLinks } from '../../../components/ui/pagination-links';
 import { AdminLayout } from '../../../layouts/admin-layout';
 import { formatPrice } from '../../../lib/price';
+import { toTitleCase } from '../../../lib/string-utils';
 import type { Book, PaginatedData } from '../../../types/alma';
 
 interface IndexProps {
     books: PaginatedData<Book>;
     filters: {
         search: string;
+        genre?: string;
+        stock_status?: string;
+        sort?: string;
         tab: 'available' | 'archived';
     };
     counts: {
         available: number;
         archived: number;
     };
+    genres?: string[];
 }
 
 interface ConfirmState {
@@ -23,27 +30,74 @@ interface ConfirmState {
     book: Book;
 }
 
-export function Index({ books, filters, counts }: IndexProps) {
+export function Index({ books, filters, counts, genres = [] }: IndexProps) {
     const [search, setSearch] = useState(filters.search || '');
+    const [genre, setGenre] = useState(filters.genre || '');
+    const [stockStatus, setStockStatus] = useState(filters.stock_status || '');
+    const [sort, setSort] = useState(filters.sort || '');
     const [selectedBookForStock, setSelectedBookForStock] = useState<Book | null>(null);
     const [isStockOpen, setIsStockOpen] = useState(false);
     const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
 
+    const applyFilters = (overrides: Partial<{ search: string; genre: string; stock_status: string; sort: string; tab: 'available' | 'archived' }> = {}) => {
+        const nextParams = {
+            search: overrides.search !== undefined ? overrides.search : search,
+            genre: overrides.genre !== undefined ? overrides.genre : genre,
+            stock_status: overrides.stock_status !== undefined ? overrides.stock_status : stockStatus,
+            sort: overrides.sort !== undefined ? overrides.sort : sort,
+            tab: overrides.tab !== undefined ? overrides.tab : filters.tab,
+        };
+        router.get('/admin/libros', nextParams, { preserveState: true, replace: true, preserveScroll: true });
+    };
+
     // Debounced search
     useEffect(() => {
         const timer = setTimeout(() => {
             if (search !== (filters.search || '')) {
-                router.get('/admin/libros', { search, tab: filters.tab }, { preserveState: true, replace: true });
+                applyFilters({ search });
             }
         }, 350);
 
         return () => clearTimeout(timer);
-    }, [search, filters.search, filters.tab]);
+    }, [search, filters.search, genre, stockStatus, sort, filters.tab]);
 
     const handleTabChange = (tab: 'available' | 'archived') => {
-        router.get('/admin/libros', { tab, search: '' }, { preserveState: true });
+        applyFilters({ tab });
     };
+
+    const handleGenreChange = (nextGenre: string) => {
+        setGenre(nextGenre);
+        applyFilters({ genre: nextGenre });
+    };
+
+    const handleStockStatusChange = (nextStockStatus: string) => {
+        setStockStatus(nextStockStatus);
+        applyFilters({ stock_status: nextStockStatus });
+    };
+
+    const handleSortChange = (nextSort: string) => {
+        setSort(nextSort);
+        applyFilters({ sort: nextSort });
+    };
+
+    const handleColumnSort = (column: 'price' | 'stock') => {
+        const asc = `${column}_asc`;
+        const desc = `${column}_desc`;
+        const nextSort = sort === asc ? desc : asc;
+        handleSortChange(nextSort);
+    };
+
+    const handleClearFilters = () => {
+        setSearch('');
+        setGenre('');
+        setStockStatus('');
+        setSort('');
+        router.get('/admin/libros', { tab: filters.tab }, { preserveState: true, replace: true, preserveScroll: true });
+    };
+
+    const hasActiveFilters = Boolean(search || genre || stockStatus || sort);
+    const isFilteredForExport = Boolean(search || genre || stockStatus || filters.tab === 'archived');
 
     const handleToggleActive = (book: Book) => {
         router.patch(`/admin/libros/${book.id}/toggle-active`, {}, { preserveScroll: true });
@@ -94,6 +148,9 @@ export function Index({ books, filters, counts }: IndexProps) {
     const handleExportExcel = () => {
         const params = new URLSearchParams({
             search: search || '',
+            genre: genre || '',
+            stock_status: stockStatus || '',
+            sort: sort || '',
             tab: filters.tab || 'available',
         });
         window.location.href = `/admin/libros/export?${params.toString()}`;
@@ -111,12 +168,16 @@ export function Index({ books, filters, counts }: IndexProps) {
                         type="button"
                         onClick={handleExportExcel}
                         className="border-paper-dark hover:bg-paper-dark/60 text-ink-muted hover:text-ink bg-paper inline-flex cursor-pointer items-center gap-1.5 rounded-xl border px-3.5 py-2.5 font-serif text-xs font-semibold shadow-xs transition-colors"
-                        title="Descargar catálogo actual en Excel"
+                        title={
+                            isFilteredForExport
+                                ? 'Exportar vista filtrada actual en Excel'
+                                : 'Exportar reporte global completo (disponibles + archivados) en Excel'
+                        }
                     >
                         <svg className="h-4 w-4 text-emerald-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
-                        Exportar Excel
+                        {isFilteredForExport ? 'Exportar Vista Filtrada' : 'Exportar Excel (Global)'}
                     </button>
                     <Link
                         href="/admin/libros/nuevo"
@@ -132,54 +193,119 @@ export function Index({ books, filters, counts }: IndexProps) {
         >
             <Head title="Gestión de Libros - Admin" />
 
-            {/* Tabs and Search Controls */}
-            <div className="flex flex-col items-stretch justify-between gap-4 sm:flex-row sm:items-center">
-                {/* Navigation Tabs */}
-                <div className="bg-paper-dark/60 border-paper-dark flex items-center rounded-xl border p-1">
-                    <button
-                        type="button"
-                        onClick={() => handleTabChange('available')}
-                        className={`flex cursor-pointer items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold transition-all ${
-                            !isArchivedTab ? 'bg-paper text-forest font-bold shadow-xs' : 'text-ink-muted hover:text-ink'
-                        }`}
-                    >
-                        <span>Disponibles</span>
-                        <span className="bg-paper-dark text-ink-muted rounded-full px-1.5 py-0.5 font-mono text-[10px]">{counts.available}</span>
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => handleTabChange('archived')}
-                        className={`flex cursor-pointer items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold transition-all ${
-                            isArchivedTab ? 'bg-paper text-amber font-bold shadow-xs' : 'text-ink-muted hover:text-ink'
-                        }`}
-                    >
-                        <span>Papelera / Archivados</span>
-                        <span className="bg-paper-dark text-ink-muted rounded-full px-1.5 py-0.5 font-mono text-[10px]">{counts.archived}</span>
-                    </button>
+            <div className="space-y-4">
+                {/* Tabs and Search Controls */}
+                <div className="flex flex-col items-stretch justify-between gap-4 sm:flex-row sm:items-center">
+                    {/* Navigation Tabs */}
+                    <div className="bg-paper-dark/60 border-paper-dark flex items-center rounded-xl border p-1">
+                        <button
+                            type="button"
+                            onClick={() => handleTabChange('available')}
+                            className={`flex cursor-pointer items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold transition-all ${
+                                !isArchivedTab ? 'bg-paper text-forest font-bold shadow-xs' : 'text-ink-muted hover:text-ink'
+                            }`}
+                        >
+                            <span>Disponibles</span>
+                            <span className="bg-paper-dark text-ink-muted rounded-full px-1.5 py-0.5 font-mono text-[10px]">{counts.available}</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => handleTabChange('archived')}
+                            className={`flex cursor-pointer items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold transition-all ${
+                                isArchivedTab ? 'bg-paper text-amber font-bold shadow-xs' : 'text-ink-muted hover:text-ink'
+                            }`}
+                        >
+                            <span>Papelera / Archivados</span>
+                            <span className="bg-paper-dark text-ink-muted rounded-full px-1.5 py-0.5 font-mono text-[10px]">{counts.archived}</span>
+                        </button>
+                    </div>
+
+                    {/* Search input */}
+                    <div className="relative w-full sm:w-72">
+                        <input
+                            type="text"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            placeholder="Buscar por título, ISBN o autor..."
+                            className="bg-paper focus:ring-forest/40 focus:border-forest text-ink w-full rounded-xl border border-stone-300 py-2 pr-4 pl-9 text-xs shadow-2xs placeholder:text-stone-400 focus:ring-2 focus:outline-none"
+                        />
+                        <svg
+                            className="absolute top-2.5 left-3 h-4 w-4 text-stone-400"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"
+                            />
+                        </svg>
+                    </div>
                 </div>
 
-                {/* Search input */}
-                <div className="relative w-full sm:w-72">
-                    <input
-                        type="text"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        placeholder="Buscar por título, ISBN o autor..."
-                        className="bg-paper focus:ring-forest/40 focus:border-forest text-ink w-full rounded-xl border border-stone-300 py-2 pr-4 pl-9 text-xs shadow-2xs placeholder:text-stone-400 focus:ring-2 focus:outline-none"
-                    />
-                    <svg
-                        className="absolute top-2.5 left-3 h-4 w-4 text-stone-400"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"
+                {/* Combinable Filter & Sort Bar */}
+                <div className="bg-paper-dark/30 border-paper-dark flex flex-wrap items-center gap-3 rounded-xl border p-3 text-xs">
+                    <div className="flex items-center gap-1.5">
+                        <span className="text-ink-muted font-semibold">Género:</span>
+                        <SearchableFilterPopover
+                            label="Todos los géneros"
+                            searchPlaceholder="Buscar género..."
+                            items={genres}
+                            selectedValue={genre || undefined}
+                            formatItem={toTitleCase}
+                            onSelect={(next) => handleGenreChange(next || '')}
+                            columns={2}
+                            align="left"
                         />
-                    </svg>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                        <label htmlFor="books-stock-filter" className="text-ink-muted font-semibold">
+                            Estado de Stock:
+                        </label>
+                        <select
+                            id="books-stock-filter"
+                            value={stockStatus}
+                            onChange={(e) => handleStockStatusChange(e.target.value)}
+                            className="bg-paper border-stone-300 text-ink focus:border-forest rounded-lg border px-2.5 py-1.5 text-xs focus:outline-none"
+                        >
+                            <option value="">Todo el stock</option>
+                            <option value="in_stock">Con stock (&gt; 0)</option>
+                            <option value="low_stock">Stock crítico (1 a 3)</option>
+                            <option value="out_of_stock">Agotados (0)</option>
+                        </select>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                        <label htmlFor="books-sort-select" className="text-ink-muted font-semibold">
+                            Ordenar por:
+                        </label>
+                        <select
+                            id="books-sort-select"
+                            value={sort}
+                            onChange={(e) => handleSortChange(e.target.value)}
+                            className="bg-paper border-stone-300 text-ink focus:border-forest rounded-lg border px-2.5 py-1.5 text-xs focus:outline-none"
+                        >
+                            <option value="">Más recientes</option>
+                            <option value="price_asc">Precio: menor a mayor</option>
+                            <option value="price_desc">Precio: mayor a menor</option>
+                            <option value="stock_asc">Stock: menor a mayor</option>
+                            <option value="stock_desc">Stock: mayor a menor</option>
+                            <option value="title_asc">Título (A-Z)</option>
+                        </select>
+                    </div>
+
+                    {hasActiveFilters && (
+                        <button
+                            type="button"
+                            onClick={handleClearFilters}
+                            className="text-forest hover:bg-forest/10 ml-auto cursor-pointer rounded-lg px-2.5 py-1.5 text-xs font-bold transition-colors"
+                        >
+                            ✕ Limpiar filtros
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -192,8 +318,32 @@ export function Index({ books, filters, counts }: IndexProps) {
                                 <th className="w-14 px-4 py-3">Portada</th>
                                 <th className="px-4 py-3">Título / ISBN</th>
                                 <th className="px-4 py-3">Autores</th>
-                                <th className="px-4 py-3">Precio</th>
-                                <th className="px-4 py-3 text-center">Stock</th>
+                                <th className="px-4 py-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleColumnSort('price')}
+                                        className="hover:text-forest inline-flex cursor-pointer items-center gap-1 font-bold uppercase transition-colors"
+                                        title="Ordenar por precio"
+                                    >
+                                        <span>Precio</span>
+                                        <span className="text-xs">
+                                            {sort === 'price_asc' ? '↑' : sort === 'price_desc' ? '↓' : '↕'}
+                                        </span>
+                                    </button>
+                                </th>
+                                <th className="px-4 py-3 text-center">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleColumnSort('stock')}
+                                        className="hover:text-forest inline-flex cursor-pointer items-center gap-1 font-bold uppercase transition-colors"
+                                        title="Ordenar por stock"
+                                    >
+                                        <span>Stock</span>
+                                        <span className="text-xs">
+                                            {sort === 'stock_asc' ? '↑' : sort === 'stock_desc' ? '↓' : '↕'}
+                                        </span>
+                                    </button>
+                                </th>
                                 <th className="px-4 py-3 text-center">Visibilidad</th>
                                 <th className="px-4 py-3 text-right">Acciones</th>
                             </tr>
@@ -374,34 +524,7 @@ export function Index({ books, filters, counts }: IndexProps) {
                             libros
                         </div>
 
-                        <div className="flex items-center gap-1">
-                            {books.links.map((link, idx) => {
-                                const cleanLabel = link.label.replace('&laquo; Previous', '← Anterior').replace('Next &raquo;', 'Siguiente →');
-
-                                if (!link.url) {
-                                    return (
-                                        <span
-                                            key={idx}
-                                            className="cursor-not-allowed rounded-lg px-3 py-1.5 text-stone-400 opacity-50 select-none"
-                                            dangerouslySetInnerHTML={{ __html: cleanLabel }}
-                                        />
-                                    );
-                                }
-
-                                return (
-                                    <Link
-                                        key={idx}
-                                        href={link.url}
-                                        preserveState
-                                        preserveScroll
-                                        className={`rounded-lg px-3 py-1.5 font-medium transition-colors ${
-                                            link.active ? 'bg-forest font-bold text-white' : 'hover:bg-paper-dark text-ink'
-                                        }`}
-                                        dangerouslySetInnerHTML={{ __html: cleanLabel }}
-                                    />
-                                );
-                            })}
-                        </div>
+                        <PaginationLinks links={books.links} />
                     </div>
                 )}
             </div>

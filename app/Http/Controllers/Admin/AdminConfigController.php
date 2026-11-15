@@ -5,10 +5,15 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\AccessoryCategory;
 use App\Models\Book;
+use App\Models\BookGenre;
 use App\Models\StoreConfig;
+use App\Support\GenreNormalizer;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -22,19 +27,26 @@ class AdminConfigController extends Controller
         $config = StoreConfig::firstOrCreate([], [
             'whatsapp_phone' => '5493875708557',
             'instagram_url' => 'https://www.instagram.com/alma.lectora.al/?hl=es-la',
-            'shipping_cost' => 0,
-            'free_shipping_min' => 0,
-            'banner_message' => null,
             'is_store_open' => true,
         ]);
 
         $categories = AccessoryCategory::orderBy('order')->get();
 
-        $genres = Book::whereNotNull('genre')
+        $bookGenres = Book::whereNotNull('genre')
             ->where('genre', '!=', '')
             ->distinct()
-            ->orderBy('genre')
-            ->pluck('genre')
+            ->pluck('genre');
+
+        $storedGenres = Schema::hasTable('book_genres')
+            ? BookGenre::pluck('name')
+            : collect();
+
+        $genres = $storedGenres
+            ->merge($bookGenres)
+            ->map(fn ($g) => trim((string) $g))
+            ->filter(fn ($g) => $g !== '')
+            ->unique(fn ($g) => GenreNormalizer::key($g))
+            ->sort()
             ->values();
 
         return Inertia::render('Admin/Config/Index', [
@@ -52,9 +64,6 @@ class AdminConfigController extends Controller
         $validated = $request->validate([
             'whatsapp_phone' => 'required|string|max:50',
             'instagram_url' => 'nullable|string|max:255',
-            'shipping_cost' => 'required|numeric|min:0',
-            'free_shipping_min' => 'required|numeric|min:0',
-            'banner_message' => 'nullable|string',
             'is_store_open' => 'required|boolean',
         ]);
 
@@ -107,7 +116,52 @@ class AdminConfigController extends Controller
     }
 
     /**
-     * Update a genre name across all books.
+     * Create a new literary genre for book classification.
+     */
+    public function storeGenre(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:100',
+        ]);
+
+        $name = trim($validated['name']);
+        if ($name === '') {
+            throw ValidationException::withMessages([
+                'name' => 'El nombre del género no puede estar vacío.',
+            ]);
+        }
+
+        if (! Schema::hasTable('book_genres')) {
+            return back()->with('error', 'Faltan ejecutar migraciones pendientes para registrar géneros.');
+        }
+
+        $existingGenres = BookGenre::pluck('name')->merge(
+            Book::withTrashed()
+                ->whereNotNull('genre')
+                ->where('genre', '!=', '')
+                ->pluck('genre')
+        );
+
+        $canonical = GenreNormalizer::resolveOrCanonical($name, $existingGenres);
+        $targetKey = GenreNormalizer::key($canonical);
+
+        $exists = $existingGenres->contains(
+            fn ($g) => GenreNormalizer::key((string) $g) === $targetKey
+        );
+
+        if ($exists) {
+            throw ValidationException::withMessages([
+                'name' => "El género \"{$canonical}\" ya se encuentra registrado.",
+            ]);
+        }
+
+        BookGenre::create(['name' => $canonical]);
+
+        return back()->with('success', "Género literario \"{$canonical}\" creado exitosamente.");
+    }
+
+    /**
+     * Update a genre name across persisted genres and all matching books.
      */
     public function updateGenre(Request $request): RedirectResponse
     {
@@ -116,13 +170,80 @@ class AdminConfigController extends Controller
             'new_name' => 'required|string|max:100',
         ]);
 
-        Book::where('genre', $validated['old_name'])->update(['genre' => trim($validated['new_name'])]);
+        $oldName = trim($validated['old_name']);
+        $newName = trim($validated['new_name']);
 
-        return back()->with('success', 'Género literario actualizado en todos los libros.');
+        if ($newName === '') {
+            throw ValidationException::withMessages([
+                'new_name' => 'El nuevo nombre del género no puede estar vacío.',
+            ]);
+        }
+
+        $oldKey = GenreNormalizer::key($oldName);
+        $canonicalNew = GenreNormalizer::canonicalCase($newName);
+        $newKey = GenreNormalizer::key($canonicalNew);
+        $hasBookGenreTable = Schema::hasTable('book_genres');
+
+        $matchingGenreIds = $hasBookGenreTable
+            ? BookGenre::all(['id', 'name'])
+                ->filter(fn (BookGenre $g) => GenreNormalizer::key($g->name) === $oldKey)
+                ->pluck('id')
+            : collect();
+
+        $matchingBookIds = Book::withTrashed()
+            ->whereNotNull('genre')
+            ->get(['id', 'genre'])
+            ->filter(fn (Book $b) => GenreNormalizer::key((string) $b->genre) === $oldKey)
+            ->pluck('id');
+
+        if ($matchingGenreIds->isEmpty() && $matchingBookIds->isEmpty()) {
+            throw ValidationException::withMessages([
+                'old_name' => "No existe ningún género registrado con el nombre \"{$oldName}\".",
+            ]);
+        }
+
+        if ($oldName === $canonicalNew) {
+            throw ValidationException::withMessages([
+                'new_name' => 'El nuevo nombre debe ser diferente al actual.',
+            ]);
+        }
+
+        if ($newKey !== $oldKey) {
+            $collision = ($hasBookGenreTable ? BookGenre::pluck('name') : collect())
+                ->merge(Book::withTrashed()->whereNotNull('genre')->pluck('genre'))
+                ->contains(fn ($g) => GenreNormalizer::key((string) $g) === $newKey);
+
+            if ($collision) {
+                throw ValidationException::withMessages([
+                    'new_name' => "Ya existe un género equivalente a \"{$canonicalNew}\".",
+                ]);
+            }
+        }
+
+        DB::transaction(function () use ($matchingBookIds, $matchingGenreIds, $canonicalNew, $newKey, $hasBookGenreTable) {
+            if ($matchingBookIds->isNotEmpty()) {
+                Book::withTrashed()->whereIn('id', $matchingBookIds)->update(['genre' => $canonicalNew]);
+            }
+
+            if ($hasBookGenreTable) {
+                if ($matchingGenreIds->isNotEmpty()) {
+                    BookGenre::whereIn('id', $matchingGenreIds)->delete();
+                }
+
+                $existsNew = BookGenre::pluck('name')
+                    ->contains(fn ($g) => GenreNormalizer::key((string) $g) === $newKey);
+
+                if (! $existsNew) {
+                    BookGenre::create(['name' => $canonicalNew]);
+                }
+            }
+        });
+
+        return back()->with('success', 'Género literario actualizado correctamente.');
     }
 
     /**
-     * Delete a genre across all books.
+     * Delete a genre from persisted genres and unlink it from all books.
      */
     public function destroyGenre(Request $request): RedirectResponse
     {
@@ -130,8 +251,38 @@ class AdminConfigController extends Controller
             'name' => 'required|string|max:100',
         ]);
 
-        Book::where('genre', $validated['name'])->update(['genre' => null]);
+        $name = trim($validated['name']);
+        $targetKey = GenreNormalizer::key($name);
+        $hasBookGenreTable = Schema::hasTable('book_genres');
 
-        return back()->with('success', 'Género desvinculado de los libros.');
+        $matchingGenreIds = $hasBookGenreTable
+            ? BookGenre::all(['id', 'name'])
+                ->filter(fn (BookGenre $g) => GenreNormalizer::key($g->name) === $targetKey)
+                ->pluck('id')
+            : collect();
+
+        $matchingBookIds = Book::withTrashed()
+            ->whereNotNull('genre')
+            ->get(['id', 'genre'])
+            ->filter(fn (Book $b) => GenreNormalizer::key((string) $b->genre) === $targetKey)
+            ->pluck('id');
+
+        if ($matchingGenreIds->isEmpty() && $matchingBookIds->isEmpty()) {
+            throw ValidationException::withMessages([
+                'name' => "No existe ningún género registrado con el nombre \"{$name}\".",
+            ]);
+        }
+
+        DB::transaction(function () use ($matchingBookIds, $matchingGenreIds, $hasBookGenreTable) {
+            if ($matchingBookIds->isNotEmpty()) {
+                Book::withTrashed()->whereIn('id', $matchingBookIds)->update(['genre' => null]);
+            }
+
+            if ($hasBookGenreTable && $matchingGenreIds->isNotEmpty()) {
+                BookGenre::whereIn('id', $matchingGenreIds)->delete();
+            }
+        });
+
+        return back()->with('success', 'Género eliminado y desvinculado de los libros.');
     }
 }

@@ -6,8 +6,12 @@ use App\Exports\AccessoriesExport;
 use App\Http\Controllers\Controller;
 use App\Models\Accessory;
 use App\Models\AccessoryCategory;
+use App\Models\Combo;
+use App\Support\HtmlSanitizer;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 use Maatwebsite\Excel\Facades\Excel;
@@ -21,9 +25,11 @@ class AdminAccessoryController extends Controller
     public function export(Request $request): BinaryFileResponse
     {
         $filters = [
-            'search' => $request->input('search', ''),
-            'category' => $request->input('category', ''),
-            'tab' => $request->input('tab', 'available'),
+            'search' => (string) $request->input('search', ''),
+            'category' => (string) $request->input('category', ''),
+            'stock_status' => (string) $request->input('stock_status', ''),
+            'sort' => (string) $request->input('sort', ''),
+            'tab' => (string) $request->input('tab', ''),
         ];
 
         return Excel::download(new AccessoriesExport($filters), 'catalogo-accesorios-alma-lectora.xlsx');
@@ -34,16 +40,24 @@ class AdminAccessoryController extends Controller
      */
     public function index(Request $request): Response
     {
-        $tab = $request->input('tab', 'available');
+        $filters = [
+            'search' => (string) $request->input('search', ''),
+            'category' => (string) $request->input('category', ''),
+            'stock_status' => (string) $request->input('stock_status', ''),
+            'sort' => (string) $request->input('sort', ''),
+            'tab' => (string) $request->input('tab', 'available'),
+        ];
 
-        $query = $tab === 'archived'
-            ? Accessory::onlyTrashed()
-            : Accessory::withoutTrashed();
+        $query = $filters['tab'] === 'archived'
+            ? Accessory::onlyTrashed()->with('category')
+            : Accessory::withoutTrashed()->with('category');
+
+        $query->filter($filters);
+        if (empty($filters['sort'])) {
+            $query->latest();
+        }
 
         $accessories = $query
-            ->with('category')
-            ->filter($request->only(['search', 'category']))
-            ->latest()
             ->paginate(10)
             ->withQueryString();
 
@@ -56,11 +70,7 @@ class AdminAccessoryController extends Controller
 
         return Inertia::render('Admin/Accessories/Index', [
             'accessories' => $accessories,
-            'filters' => [
-                'search' => $request->input('search', ''),
-                'category' => $request->input('category', ''),
-                'tab' => $tab,
-            ],
+            'filters' => $filters,
             'counts' => $counts,
             'categories' => $categories,
         ]);
@@ -83,33 +93,7 @@ class AdminAccessoryController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'title' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'price' => 'required|numeric|min:0',
-            'promo_quantity' => 'nullable|integer|min:1',
-            'promo_price' => 'nullable|numeric|min:0',
-            'stock' => 'required|integer|min:0',
-            'category_id' => 'nullable|uuid|exists:accessory_categories,id',
-            'category' => 'nullable|string|max:100',
-            'cover_url' => 'nullable|string|max:1000',
-            'additional_images' => 'nullable|array',
-            'is_active' => 'boolean',
-        ]);
-
-        if (empty($validated['category_id']) && !empty($validated['category'])) {
-            $catVal = $validated['category'];
-            $validated['category_id'] = AccessoryCategory::where('id', $catVal)
-                ->orWhere('slug', $catVal)
-                ->orWhereRaw('LOWER(label) = ?', [mb_strtolower($catVal)])
-                ->value('id');
-        }
-
-        if (empty($validated['category_id'])) {
-            $validated['category_id'] = AccessoryCategory::orderBy('order')->value('id');
-        }
-
-        unset($validated['category']);
+        $validated = $this->validateAndResolveAccessory($request);
 
         Accessory::create($validated);
 
@@ -135,6 +119,33 @@ class AdminAccessoryController extends Controller
      */
     public function update(Request $request, Accessory $accessory): RedirectResponse
     {
+        $previousImages = array_filter(array_merge(
+            [$accessory->cover_url],
+            is_array($accessory->additional_images) ? $accessory->additional_images : []
+        ));
+
+        $validated = $this->validateAndResolveAccessory($request);
+
+        $accessory->update($validated);
+
+        $currentImages = array_filter(array_merge(
+            [$accessory->cover_url],
+            is_array($accessory->additional_images) ? $accessory->additional_images : []
+        ));
+        foreach (array_diff($previousImages, $currentImages) as $removedUrl) {
+            AdminMediaController::deleteLocalUploadIfUnused($removedUrl);
+        }
+
+        return redirect()->route('admin.accessories.index')->with('success', 'Accesorio actualizado con éxito.');
+    }
+
+    /**
+     * Validate accessory payload and safely resolve category_id without querying UUID columns with non-UUID text.
+     *
+     * @return array<string, mixed>
+     */
+    protected function validateAndResolveAccessory(Request $request): array
+    {
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
@@ -145,27 +156,48 @@ class AdminAccessoryController extends Controller
             'category_id' => 'nullable|uuid|exists:accessory_categories,id',
             'category' => 'nullable|string|max:100',
             'cover_url' => 'nullable|string|max:1000',
-            'additional_images' => 'nullable|array',
+            'additional_images' => 'nullable|array|max:3',
+            'additional_images.*' => 'nullable|string|max:2048',
             'is_active' => 'boolean',
         ]);
 
-        if (empty($validated['category_id']) && !empty($validated['category'])) {
-            $catVal = $validated['category'];
-            $validated['category_id'] = AccessoryCategory::where('id', $catVal)
-                ->orWhere('slug', $catVal)
-                ->orWhereRaw('LOWER(label) = ?', [mb_strtolower($catVal)])
-                ->value('id');
+        $validated['description'] = HtmlSanitizer::clean($validated['description'] ?? null);
+
+        $validated['additional_images'] = array_values(array_filter(
+            $validated['additional_images'] ?? [],
+            fn ($u) => is_string($u) && trim($u) !== ''
+        ));
+
+        if (empty($validated['category_id']) && ! empty($validated['category'])) {
+            $catVal = trim((string) $validated['category']);
+
+            if (Str::isUuid($catVal)) {
+                $category = AccessoryCategory::find($catVal);
+            } else {
+                $normalized = mb_strtolower($catVal);
+                $category = AccessoryCategory::whereRaw('LOWER(slug) = ?', [$normalized])
+                    ->orWhereRaw('LOWER(label) = ?', [$normalized])
+                    ->first();
+            }
+
+            if (! $category) {
+                throw ValidationException::withMessages([
+                    'category' => 'La categoría seleccionada no existe.',
+                ]);
+            }
+
+            $validated['category_id'] = $category->id;
         }
 
         if (empty($validated['category_id'])) {
-            $validated['category_id'] = AccessoryCategory::orderBy('order')->value('id');
+            throw ValidationException::withMessages([
+                'category_id' => 'La categoría es obligatoria.',
+            ]);
         }
 
         unset($validated['category']);
 
-        $accessory->update($validated);
-
-        return redirect()->route('admin.accessories.index')->with('success', 'Accesorio actualizado con éxito.');
+        return $validated;
     }
 
     /**
@@ -214,12 +246,33 @@ class AdminAccessoryController extends Controller
     }
 
     /**
-     * Remove the specified accessory permanently from storage.
+     * Remove the specified accessory permanently from storage, guarding combo integrity.
      */
     public function forceDestroy(string $id): RedirectResponse
     {
         $accessory = Accessory::withTrashed()->findOrFail($id);
+
+        $blockingCombos = Combo::withTrashed()
+            ->whereHas('accessories', fn ($q) => $q->where('accessory_id', $accessory->id))
+            ->pluck('title');
+
+        if ($blockingCombos->isNotEmpty()) {
+            return back()->with(
+                'error',
+                "No se puede eliminar definitivamente el accesorio \"{$accessory->title}\" porque forma parte de los combos: ".$blockingCombos->implode(', ').'.'
+            );
+        }
+
+        $images = array_filter(array_merge(
+            [$accessory->cover_url],
+            is_array($accessory->additional_images) ? $accessory->additional_images : []
+        ));
+
         $accessory->forceDelete();
+
+        foreach ($images as $url) {
+            AdminMediaController::deleteLocalUploadIfUnused($url);
+        }
 
         return back()->with('success', 'Accesorio eliminado definitivamente.');
     }

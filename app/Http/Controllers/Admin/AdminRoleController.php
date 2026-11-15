@@ -15,7 +15,8 @@ class AdminRoleController extends Controller
     public function index(): Response
     {
         return Inertia::render('Admin/Roles/Index', [
-            'roles' => Role::with('permissions:id,name')->get(),
+            'roles' => Role::with('permissions:id,name')->orderBy('id')->get(),
+            'permissions' => Permission::orderBy('name')->get(['id', 'name', 'guard_name', 'created_at']),
         ]);
     }
 
@@ -91,15 +92,14 @@ class AdminRoleController extends Controller
 
     public function destroy(Role $role): RedirectResponse
     {
-        // REGLA CRÍTICA: No permitir eliminar roles esenciales del sistema
-        if (in_array($role->name, ['super-admin', 'admin', 'client', 'guest'])) {
-            return redirect()->back()->withErrors([
-                'error' => "No es posible eliminar el rol esencial '{$role->name}'."
-            ]);
+        // REGLA CRÍTICA: No permitir eliminar los roles esenciales del sistema
+        if (in_array(strtolower($role->name), ['super-admin', 'admin', 'client', 'guest'])) {
+            return redirect()->route('admin.roles.index')
+                ->with('error', "No es posible eliminar el rol esencial del sistema '{$role->name}'.");
         }
 
         $role->delete();
 
-        return redirect()->route('admin.roles.index')->with('success', 'Rol eliminado correctamente.');
+        return redirect()->route('admin.roles.index')->with('success', "Rol '{$role->name}' eliminado correctamente.");
     }
 }

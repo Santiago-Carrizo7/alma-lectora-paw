@@ -24,53 +24,61 @@ export function QuickStockModal({
     isPending = false,
     book,
 }: QuickStockModalProps) {
-    const [localStock, setLocalStock] = useState<number>(0);
+    const [localStock, setLocalStock] = useState<string>('0');
     const [isInternalProcessing, setIsInternalProcessing] = useState<boolean>(false);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     const resolvedTitle = title ?? book?.title ?? 'Producto';
     const resolvedSubtitle = subtitle ?? (book ? `ISBN: ${book.isbn}` : undefined);
     const effectiveStock = initialStock ?? book?.stock ?? 0;
+    const numericStock = localStock === '' ? 0 : Math.max(0, parseInt(localStock, 10) || 0);
 
     useEffect(() => {
         if (isOpen) {
-            setLocalStock(effectiveStock);
+            setLocalStock(String(effectiveStock));
+            setErrorMessage(null);
         }
     }, [effectiveStock, isOpen]);
 
     if (!isOpen) return null;
 
     const handleDecrement = () => {
-        setLocalStock((prev) => Math.max(0, prev - 1));
+        setLocalStock((prev) => String(Math.max(0, (parseInt(prev, 10) || 0) - 1)));
     };
 
     const handleIncrement = () => {
-        setLocalStock((prev) => prev + 1);
+        setLocalStock((prev) => String((parseInt(prev, 10) || 0) + 1));
     };
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const val = parseInt(e.target.value, 10);
+        const raw = e.target.value;
+        if (raw === '') {
+            setLocalStock('');
+            return;
+        }
+        const val = parseInt(raw, 10);
         if (!isNaN(val) && val >= 0) {
-            setLocalStock(val);
-        } else if (e.target.value === '') {
-            setLocalStock(0);
+            setLocalStock(String(val));
         }
     };
 
     const handleSaveAction = async () => {
+        setErrorMessage(null);
         if (onSave) {
             try {
                 setIsInternalProcessing(true);
-                await onSave(localStock);
+                await onSave(numericStock);
                 setIsInternalProcessing(false);
                 onClose();
             } catch {
                 setIsInternalProcessing(false);
+                setErrorMessage('No se pudo guardar el stock. Verificá el valor o tu conexión.');
             }
         } else if (book) {
             setIsInternalProcessing(true);
             router.patch(
                 `/admin/libros/${book.id}/stock`,
-                { stock: localStock },
+                { stock: numericStock },
                 {
                     preserveScroll: true,
                     onSuccess: () => {
@@ -79,6 +87,7 @@ export function QuickStockModal({
                     },
                     onError: () => {
                         setIsInternalProcessing(false);
+                        setErrorMessage('No se pudo guardar el stock del libro.');
                     },
                 },
             );
@@ -109,7 +118,7 @@ export function QuickStockModal({
                     <button
                         type="button"
                         onClick={handleDecrement}
-                        disabled={localStock <= 0 || processing}
+                        disabled={numericStock <= 0 || processing}
                         className="bg-paper-dark hover:bg-stone-200 border-stone-300 text-ink focus:ring-forest flex h-16 w-16 cursor-pointer items-center justify-center rounded-full border text-2xl font-bold transition-all select-none focus:ring-2 focus:outline-none active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
                         aria-label="Disminuir stock"
                     >
@@ -139,6 +148,12 @@ export function QuickStockModal({
                         +
                     </button>
                 </div>
+
+                {errorMessage && (
+                    <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-center text-xs font-medium text-red-700">
+                        {errorMessage}
+                    </div>
+                )}
 
                 {/* Action Buttons */}
                 <div className="flex items-center gap-3 pt-2">

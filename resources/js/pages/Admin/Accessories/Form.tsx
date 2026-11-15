@@ -1,5 +1,6 @@
 import { Head, Link, useForm } from '@inertiajs/react';
 import React from 'react';
+import { ImageGalleryUpload } from '../../../components/admin/image-gallery-upload';
 import { AdminLayout } from '../../../layouts/admin-layout';
 
 interface CategoryItem {
@@ -20,6 +21,7 @@ interface AccessoryItem {
     category_id?: string;
     category?: string | CategoryItem;
     cover_url: string | null;
+    additional_images?: string[];
     is_active: boolean;
 }
 
@@ -45,8 +47,9 @@ export function Form({ accessory, categories }: FormProps) {
         price: accessory?.price !== undefined ? String(accessory.price) : '',
         promo_quantity: accessory?.promo_quantity ? String(accessory.promo_quantity) : '',
         promo_price: accessory?.promo_price ? String(accessory.promo_price) : '',
-        stock: accessory?.stock !== undefined ? accessory.stock : 0,
+        stock: accessory?.stock !== undefined ? String(accessory.stock) : '0',
         cover_url: accessory?.cover_url || '',
+        additional_images: (accessory?.additional_images || []) as string[],
         description: accessory?.description || '',
         is_active: accessory ? accessory.is_active : true,
     });
@@ -106,8 +109,12 @@ export function Form({ accessory, categories }: FormProps) {
                             <select
                                 value={form.data.category_id || form.data.category}
                                 onChange={(e) => {
-                                    form.setData('category_id', e.target.value);
-                                    form.setData('category', e.target.value);
+                                    const selectedId = e.target.value;
+                                    form.setData((prev) => ({
+                                        ...prev,
+                                        category_id: selectedId,
+                                        category: selectedId,
+                                    }));
                                 }}
                                 className="bg-paper focus:ring-forest/40 focus:border-forest text-ink w-full rounded-xl border border-stone-300 px-3.5 py-2.5 text-xs focus:ring-2"
                                 required
@@ -118,7 +125,11 @@ export function Form({ accessory, categories }: FormProps) {
                                     </option>
                                 ))}
                             </select>
-                            {form.errors.category && <p className="text-xs font-medium text-red-600">{form.errors.category}</p>}
+                            {(form.errors.category_id || form.errors.category) && (
+                                <p className="text-xs font-medium text-red-600">
+                                    {form.errors.category_id || form.errors.category}
+                                </p>
+                            )}
                         </div>
 
                         {/* Description */}
@@ -148,7 +159,7 @@ export function Form({ accessory, categories }: FormProps) {
                         {/* Price */}
                         <div className="space-y-1.5">
                             <label className="text-ink-muted text-xs font-bold tracking-wider uppercase">
-                                Precio Normal ($) <span className="text-red-600">*</span>
+                                Precio ($) <span className="text-red-600">*</span>
                             </label>
                             <input
                                 type="number"
@@ -172,7 +183,7 @@ export function Form({ accessory, categories }: FormProps) {
                                 type="number"
                                 min="0"
                                 value={form.data.stock}
-                                onChange={(e) => form.setData('stock', parseInt(e.target.value, 10) || 0)}
+                                onChange={(e) => form.setData('stock', e.target.value)}
                                 className="bg-paper focus:ring-forest/40 focus:border-forest text-ink w-full rounded-xl border border-stone-300 px-3.5 py-2.5 font-mono text-xs focus:ring-2"
                                 required
                             />
@@ -219,37 +230,16 @@ export function Form({ accessory, categories }: FormProps) {
                     </h3>
 
                     <div className="space-y-4">
-                        {/* Cover URL */}
-                        <div className="space-y-1.5">
-                            <label className="text-ink-muted text-xs font-bold tracking-wider uppercase">
-                                URL de Portada / Imagen
-                            </label>
-                            <input
-                                type="url"
-                                value={form.data.cover_url}
-                                onChange={(e) => form.setData('cover_url', e.target.value)}
-                                placeholder="https://images.unsplash.com/... o https://ejemplo.com/vela.jpg"
-                                className="bg-paper focus:ring-forest/40 focus:border-forest text-ink w-full rounded-xl border border-stone-300 px-3.5 py-2.5 font-mono text-xs focus:ring-2"
-                            />
-                            {form.errors.cover_url && <p className="text-xs font-medium text-red-600">{form.errors.cover_url}</p>}
-                        </div>
-
-                        {/* Preview */}
-                        {form.data.cover_url && (
-                            <div className="bg-paper-dark/30 border-paper-dark/70 flex items-center gap-4 rounded-xl border p-3">
-                                <img
-                                    src={form.data.cover_url}
-                                    alt="Vista previa"
-                                    className="border-paper-dark/80 h-16 w-14 shrink-0 rounded-lg border object-cover shadow-2xs"
-                                    onError={(e) => {
-                                        (e.target as HTMLImageElement).style.display = 'none';
-                                    }}
-                                />
-                                <div className="text-ink-muted text-xs">
-                                    <p className="text-ink font-semibold">Vista previa de imagen</p>
-                                    <p className="text-[11px] text-stone-400">La imagen se renderizará en el catálogo y la ficha del producto.</p>
-                                </div>
-                            </div>
+                        {/* Image Gallery Upload (3 slots) */}
+                        <ImageGalleryUpload
+                            coverUrl={form.data.cover_url}
+                            additionalImages={form.data.additional_images}
+                            onCoverChange={(url) => form.setData('cover_url', url)}
+                            onAdditionalImagesChange={(images) => form.setData('additional_images', images)}
+                            disabled={form.processing}
+                        />
+                        {form.errors.cover_url && (
+                            <p className="text-xs font-medium text-red-600">{form.errors.cover_url}</p>
                         )}
 
                         {/* Active Checkbox */}

@@ -4,15 +4,19 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\OrderLead;
+use App\Services\OrderService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response as HttpResponse;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class AdminOrderController extends Controller
 {
+    public function __construct(protected OrderService $orderService) {}
     /**
      * Generate a PDF dispatch/packing slip (remito) for the given order.
      */
@@ -82,18 +86,70 @@ class AdminOrderController extends Controller
             'status' => 'required|in:PENDING_WHATSAPP,CONFIRMED,CANCELLED',
         ]);
 
-        $order->update(['status' => $validated['status']]);
+        $newStatus = $validated['status'];
 
-        $actionText = $validated['status'] === 'CONFIRMED' ? 'confirmado' : ($validated['status'] === 'CANCELLED' ? 'cancelado' : 'actualizado');
+        $missingRestore = [];
+        $errorKey = 'stock';
 
-        return back()->with('success', "Pedido {$actionText} correctamente.");
+        $errorMessage = DB::transaction(function () use ($order, $newStatus, &$missingRestore, &$errorKey): ?string {
+            $lockedOrder = OrderLead::whereKey($order->id)->lockForUpdate()->firstOrFail();
+            $previousStatus = $lockedOrder->status;
+
+            // Idempotent no-op if the order already transitioned to the requested status.
+            if ($previousStatus === $newStatus) {
+                return null;
+            }
+
+            $allowedTransitions = [
+                'PENDING_WHATSAPP' => ['CONFIRMED', 'CANCELLED'],
+                'CONFIRMED' => ['CANCELLED', 'PENDING_WHATSAPP'],
+                'CANCELLED' => ['PENDING_WHATSAPP'],
+            ];
+
+            if (! in_array($newStatus, $allowedTransitions[$previousStatus] ?? [], true)) {
+                $errorKey = 'status';
+                return 'Transición de estado no permitida: reactivá el pedido a pendiente antes de confirmarlo.';
+            }
+
+            if ($previousStatus !== 'CONFIRMED' && $newStatus === 'CONFIRMED') {
+                $stockError = $this->orderService->confirmOrderStock($lockedOrder);
+                if ($stockError !== null) {
+                    return $stockError;
+                }
+            } elseif ($previousStatus === 'CONFIRMED' && $newStatus !== 'CONFIRMED') {
+                $missingRestore = $this->orderService->restoreOrderStock($lockedOrder);
+            }
+
+            $lockedOrder->update(['status' => $newStatus]);
+
+            return null;
+        });
+
+        if ($errorMessage !== null) {
+            throw ValidationException::withMessages([
+                $errorKey => $errorMessage,
+            ]);
+        }
+
+        $actionText = $newStatus === 'CONFIRMED' ? 'confirmado' : ($newStatus === 'CANCELLED' ? 'cancelado' : 'actualizado');
+        $response = back()->with('success', "Pedido {$actionText} correctamente.");
+
+        if (! empty($missingRestore)) {
+            $response->with('error', 'No se pudo reponer stock de los siguientes productos eliminados definitivamente: '.implode(', ', $missingRestore).'.');
+        }
+
+        return $response;
     }
 
     /**
-     * Permanently remove an order lead from the system.
+     * Permanently remove an order lead from the system (confirmed orders must be cancelled first).
      */
     public function destroy(OrderLead $order): RedirectResponse
     {
+        if ($order->status === 'CONFIRMED') {
+            return back()->with('error', 'No se puede eliminar un pedido confirmado directamente. Cancelalo primero para reponer el stock en el inventario.');
+        }
+
         $order->delete();
 
         return back()->with('success', 'Pedido eliminado correctamente.');

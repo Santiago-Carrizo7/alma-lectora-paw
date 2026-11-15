@@ -1,6 +1,7 @@
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import React from 'react';
 import { AdminLayout } from '../../../layouts/admin-layout';
+import type { SharedData } from '../../../types';
 
 interface RoleRef {
     id: number;
@@ -21,6 +22,10 @@ interface EditUserProps {
 }
 
 export default function EditUser({ user, roles, userRoles }: EditUserProps) {
+    const { props } = usePage<SharedData>();
+    const currentUserId = props.auth?.user?.id;
+    const isCurrentUser = Number(user.id) === Number(currentUserId);
+
     const { data, setData, put, processing, errors } = useForm({
         name: user.name,
         email: user.email,
@@ -31,6 +36,9 @@ export default function EditUser({ user, roles, userRoles }: EditUserProps) {
     });
 
     const handleRoleToggle = (roleName: string) => {
+        if (isCurrentUser && roleName === 'super-admin' && data.roles.includes('super-admin')) {
+            return;
+        }
         if (data.roles.includes(roleName)) {
             setData(
                 'roles',
@@ -56,6 +64,16 @@ export default function EditUser({ user, roles, userRoles }: EditUserProps) {
             <Head title={`Editar ${user.name} | Alma Lectora Admin`} />
 
             <form onSubmit={handleSubmit} className="bg-paper border-paper-dark/60 max-w-2xl space-y-6 rounded-2xl border p-6 sm:p-8 shadow-xs">
+                {isCurrentUser && (
+                    <div className="bg-forest/10 border-forest/30 text-forest flex items-start gap-3 rounded-xl border p-4 text-xs leading-relaxed">
+                        <svg className="h-5 w-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.57-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" />
+                        </svg>
+                        <span>
+                            <strong>Estás editando tu propia cuenta.</strong> Tu rol de Super Administrador está protegido para evitar bloqueos accidentales, pero podés asignarte roles adicionales (por ejemplo, Admin o Client).
+                        </span>
+                    </div>
+                )}
                 {/* Nombre */}
                 <div>
                     <label className="text-ink font-serif text-sm font-bold block mb-1">
@@ -134,23 +152,30 @@ export default function EditUser({ user, roles, userRoles }: EditUserProps) {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                         {roles.map((r) => {
                             const isChecked = data.roles.includes(r.name);
+                            const isLockedSuperAdmin = isCurrentUser && r.name === 'super-admin' && isChecked;
                             return (
                                 <label
                                     key={r.id}
-                                    className={`flex items-center gap-3 p-3 rounded-xl border text-xs cursor-pointer transition-all ${
-                                        isChecked
-                                            ? 'bg-forest/5 border-forest/30 text-ink'
-                                            : 'bg-paper-light/50 border-paper-dark/40 text-ink-muted hover:bg-paper-light'
+                                    className={`flex items-center gap-3 p-3 rounded-xl border text-xs transition-all ${
+                                        isLockedSuperAdmin
+                                            ? 'bg-forest/10 border-forest/40 text-ink cursor-not-allowed'
+                                            : isChecked
+                                              ? 'bg-forest/5 border-forest/30 text-ink cursor-pointer'
+                                              : 'bg-paper-light/50 border-paper-dark/40 text-ink-muted hover:bg-paper-light cursor-pointer'
                                     }`}
                                 >
                                     <input
                                         type="checkbox"
                                         checked={isChecked}
+                                        disabled={isLockedSuperAdmin}
                                         onChange={() => handleRoleToggle(r.name)}
-                                        className="text-forest focus:ring-forest rounded"
+                                        className="text-forest focus:ring-forest rounded disabled:opacity-60"
                                     />
                                     <div>
                                         <span className="font-bold capitalize">{r.name}</span>
+                                        {isLockedSuperAdmin && (
+                                            <span className="text-forest ml-1.5 text-[10px] font-bold">(Protegido)</span>
+                                        )}
                                         <p className="text-[10px] text-ink-muted">
                                             {r.name === 'super-admin'
                                                 ? 'Acceso total y administración de seguridad'
@@ -173,11 +198,13 @@ export default function EditUser({ user, roles, userRoles }: EditUserProps) {
                         type="checkbox"
                         id="is_active_edit"
                         checked={data.is_active}
+                        disabled={isCurrentUser}
                         onChange={(e) => setData('is_active', e.target.checked)}
-                        className="text-forest focus:ring-forest rounded"
+                        className="text-forest focus:ring-forest rounded disabled:opacity-60"
                     />
                     <label htmlFor="is_active_edit" className="text-xs text-ink font-semibold cursor-pointer">
                         Usuario activo (permite iniciar sesión)
+                        {isCurrentUser && <span className="text-ink-muted ml-1 font-normal">(No podés desactivar tu propia cuenta)</span>}
                     </label>
                 </div>
 

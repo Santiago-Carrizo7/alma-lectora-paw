@@ -1,6 +1,7 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 import { BookThumbnail } from '../../../components/ui/book-thumbnail';
+import { PaginationLinks } from '../../../components/ui/pagination-links';
 import { AdminLayout } from '../../../layouts/admin-layout';
 import { formatPrice } from '../../../lib/price';
 import type { PaginatedData } from '../../../types/alma';
@@ -12,6 +13,7 @@ interface OrderItem {
     quantity: number;
     unitPrice?: number | string;
     unit_price?: number | string;
+    subtotal?: number | string;
     coverUrl?: string | null;
     cover_url?: string | null;
 }
@@ -47,18 +49,14 @@ interface IndexProps {
 interface ConfirmStatusState {
     orderId: string;
     customerName: string;
-    status: 'CONFIRMED' | 'CANCELLED';
-}
-
-interface DeleteState {
-    orderId: string;
-    customerName: string;
+    fromStatus: 'PENDING_WHATSAPP' | 'CONFIRMED' | 'CANCELLED';
+    status: 'PENDING_WHATSAPP' | 'CONFIRMED' | 'CANCELLED';
 }
 
 export function Index({ orders, filters, counts }: IndexProps) {
     const [search, setSearch] = useState(filters.search || '');
     const [confirmState, setConfirmState] = useState<ConfirmStatusState | null>(null);
-    const [deleteState, setDeleteState] = useState<DeleteState | null>(null);
+    const [confirmError, setConfirmError] = useState<string | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
 
     // Debounced search
@@ -85,6 +83,7 @@ export function Index({ orders, filters, counts }: IndexProps) {
 
     const handleConfirmStatus = () => {
         if (!confirmState) return;
+        setConfirmError(null);
         setIsProcessing(true);
         router.patch(
             `/admin/pedidos/${confirmState.orderId}/estado`,
@@ -93,24 +92,20 @@ export function Index({ orders, filters, counts }: IndexProps) {
                 preserveScroll: true,
                 onSuccess: () => {
                     setConfirmState(null);
+                    setConfirmError(null);
                     setIsProcessing(false);
                 },
-                onError: () => setIsProcessing(false),
+                onError: (errors) => {
+                    setIsProcessing(false);
+                    const message =
+                        errors.stock ||
+                        errors.status ||
+                        Object.values(errors)[0] ||
+                        'No se pudo actualizar el estado del pedido.';
+                    setConfirmError(message);
+                },
             },
         );
-    };
-
-    const handleDeleteOrder = () => {
-        if (!deleteState) return;
-        setIsProcessing(true);
-        router.delete(`/admin/pedidos/${deleteState.orderId}`, {
-            preserveScroll: true,
-            onSuccess: () => {
-                setDeleteState(null);
-                setIsProcessing(false);
-            },
-            onError: () => setIsProcessing(false),
-        });
     };
 
     const getWhatsAppUrl = (phone: string) => {
@@ -160,8 +155,68 @@ export function Index({ orders, filters, counts }: IndexProps) {
                     </div>
                 </div>
 
-                {/* Tabs */}
-                <div className="border-paper-dark flex border-b pb-1 gap-2 overflow-x-auto">
+                {/* Mobile: Grilla 2x2 sin scroll horizontal */}
+                <div className="grid grid-cols-2 gap-2 sm:hidden">
+                    <button
+                        type="button"
+                        onClick={() => handleTabChange('PENDING_WHATSAPP')}
+                        className={`flex cursor-pointer items-center justify-between rounded-xl border px-3 py-2.5 text-xs font-semibold transition-all ${
+                            filters.tab === 'PENDING_WHATSAPP'
+                                ? 'border-amber bg-amber/10 text-amber font-bold shadow-2xs'
+                                : 'border-paper-dark bg-paper text-ink-muted hover:text-ink'
+                        }`}
+                    >
+                        <span>Pendientes</span>
+                        <span className="bg-amber/15 text-amber rounded-full px-2 py-0.5 font-mono text-[10px] font-bold">
+                            {counts.PENDING_WHATSAPP}
+                        </span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => handleTabChange('CONFIRMED')}
+                        className={`flex cursor-pointer items-center justify-between rounded-xl border px-3 py-2.5 text-xs font-semibold transition-all ${
+                            filters.tab === 'CONFIRMED'
+                                ? 'border-forest bg-forest/10 text-forest font-bold shadow-2xs'
+                                : 'border-paper-dark bg-paper text-ink-muted hover:text-ink'
+                        }`}
+                    >
+                        <span>Confirmados</span>
+                        <span className="bg-forest/15 text-forest rounded-full px-2 py-0.5 font-mono text-[10px] font-bold">
+                            {counts.CONFIRMED}
+                        </span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => handleTabChange('CANCELLED')}
+                        className={`flex cursor-pointer items-center justify-between rounded-xl border px-3 py-2.5 text-xs font-semibold transition-all ${
+                            filters.tab === 'CANCELLED'
+                                ? 'border-red-500 bg-red-50 text-red-600 font-bold shadow-2xs'
+                                : 'border-paper-dark bg-paper text-ink-muted hover:text-ink'
+                        }`}
+                    >
+                        <span>Cancelados</span>
+                        <span className="rounded-full bg-red-100 px-2 py-0.5 font-mono text-[10px] font-bold text-red-600">
+                            {counts.CANCELLED}
+                        </span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => handleTabChange('ALL')}
+                        className={`flex cursor-pointer items-center justify-between rounded-xl border px-3 py-2.5 text-xs font-semibold transition-all ${
+                            filters.tab === 'ALL'
+                                ? 'border-stone-500 bg-stone-100 text-stone-800 font-bold shadow-2xs'
+                                : 'border-paper-dark bg-paper text-ink-muted hover:text-ink'
+                        }`}
+                    >
+                        <span>Todos</span>
+                        <span className="rounded-full bg-stone-200 px-2 py-0.5 font-mono text-[10px] font-bold text-stone-700">
+                            {counts.ALL}
+                        </span>
+                    </button>
+                </div>
+
+                {/* Desktop: Tabs */}
+                <div className="border-paper-dark hidden border-b pb-1 gap-2 sm:flex">
                     <button
                         type="button"
                         onClick={() => handleTabChange('PENDING_WHATSAPP')}
@@ -276,21 +331,6 @@ export function Index({ orders, filters, counts }: IndexProps) {
                                                     ? 'CONFIRMADO'
                                                     : 'CANCELADO'}
                                             </span>
-                                            <button
-                                                type="button"
-                                                title="Eliminar pedido"
-                                                onClick={() =>
-                                                    setDeleteState({
-                                                        orderId: order.id,
-                                                        customerName: order.customer_name,
-                                                    })
-                                                }
-                                                className="hover:bg-red-50 text-stone-400 hover:text-red-600 cursor-pointer rounded p-1 transition-colors"
-                                            >
-                                                <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
-                                                </svg>
-                                            </button>
                                         </div>
                                     </div>
 
@@ -322,10 +362,20 @@ export function Index({ orders, filters, counts }: IndexProps) {
                                                 rel="noopener noreferrer"
                                                 className="inline-flex items-center gap-2 bg-[#25D366] hover:bg-[#20ba59] active:scale-[0.98] text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold shadow-xs transition-all cursor-pointer"
                                             >
-                                                <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
-                                                    <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.513 2.262 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.455L0 24zm6.59-4.846c1.62.962 3.21 1.454 4.887 1.455 5.483 0 9.943-4.453 9.946-9.93.002-2.653-1.03-5.148-2.906-7.027-1.875-1.878-4.37-2.914-7.022-2.915-5.485 0-9.946 4.454-9.95 9.932-.001 1.839.492 3.633 1.427 5.22l-.993 3.626 3.71-.973zm13.125-9.664c-.3-.15-1.776-.875-2.05-.975-.274-.1-.475-.15-.676.15-.2.3-.775.975-.95 1.175-.175.2-.35.225-.65.075-.3-.15-1.265-.467-2.41-1.485-.89-.795-1.49-1.77-1.665-2.07-.175-.3-.02-.46.13-.61.135-.133.3-.35.45-.525.15-.175.2-.3.3-.5.1-.2.05-.375-.025-.525-.075-.15-.676-1.625-.926-2.225-.244-.589-.49-.51-.676-.52-.175-.01-.375-.01-.575-.01-.2 0-.525.075-.8.375-.275.3-1.05 1.025-1.05 2.5s1.075 2.9 1.225 3.1c.15.2 2.11 3.224 5.112 4.525.715.31 1.273.495 1.71.635.717.227 1.37.195 1.885.118.574-.085 1.776-.725 2.025-1.425.25-.7.25-1.3 0-1.425-.075-.125-.275-.2-.575-.35z" />
+                                                <svg
+                                                    className="h-4 w-4 shrink-0"
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    strokeWidth="2"
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    viewBox="0 0 24 24"
+                                                    aria-hidden="true"
+                                                >
+                                                    <path d="M3 21l1.65-3.8a9 9 0 1 1 3.4 2.9L3 21" />
+                                                    <path d="M9 10a.5.5 0 0 0 1 0V9a.5.5 0 0 0-1 0v1a5 5 0 0 0 5 5h1a.5.5 0 0 0 0-1h-1a.5.5 0 0 0 0 1" />
                                                 </svg>
-                                                <span>Chatear (+{order.customer_phone})</span>
+                                                <span>Chatear (+{order.customer_phone.replace(/^\++/, '').trim()})</span>
                                             </a>
                                         </div>
                                     </div>
@@ -338,7 +388,10 @@ export function Index({ orders, filters, counts }: IndexProps) {
                                         <div className="divide-paper-dark/60 divide-y max-h-48 overflow-y-auto pr-1">
                                             {order.items?.map((item, idx) => {
                                                 const unitPrice = item.unitPrice ?? item.unit_price ?? 0;
-                                                const itemSubtotal = parseFloat(String(unitPrice)) * item.quantity;
+                                                const itemSubtotal =
+                                                    item.subtotal !== undefined
+                                                        ? parseFloat(String(item.subtotal))
+                                                        : parseFloat(String(unitPrice)) * item.quantity;
                                                 const cover = item.coverUrl ?? item.cover_url ?? null;
 
                                                 return (
@@ -383,30 +436,89 @@ export function Index({ orders, filters, counts }: IndexProps) {
                                             </span>
                                         </div>
 
+                                        {order.status === 'CONFIRMED' && (
+                                            <div className="grid grid-cols-2 gap-2.5 pt-1">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setConfirmError(null);
+                                                        setConfirmState({
+                                                            orderId: order.id,
+                                                            customerName: order.customer_name,
+                                                            fromStatus: 'CONFIRMED',
+                                                            status: 'PENDING_WHATSAPP',
+                                                        });
+                                                    }}
+                                                    className="border border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100 cursor-pointer rounded-xl py-2.5 px-2 font-serif text-xs font-bold shadow-xs transition-colors"
+                                                >
+                                                    Revertir a Pendiente
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setConfirmError(null);
+                                                        setConfirmState({
+                                                            orderId: order.id,
+                                                            customerName: order.customer_name,
+                                                            fromStatus: 'CONFIRMED',
+                                                            status: 'CANCELLED',
+                                                        });
+                                                    }}
+                                                    className="border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 cursor-pointer rounded-xl py-2.5 px-2 font-serif text-xs font-bold shadow-xs transition-colors"
+                                                >
+                                                    Cancelar y reponer stock
+                                                </button>
+                                            </div>
+                                        )}
+
+                                        {order.status === 'CANCELLED' && (
+                                            <div className="pt-1">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setConfirmError(null);
+                                                        setConfirmState({
+                                                            orderId: order.id,
+                                                            customerName: order.customer_name,
+                                                            fromStatus: 'CANCELLED',
+                                                            status: 'PENDING_WHATSAPP',
+                                                        });
+                                                    }}
+                                                    className="w-full border border-forest/30 bg-forest/10 text-forest hover:bg-forest/20 cursor-pointer rounded-xl py-2.5 font-serif text-xs font-bold shadow-xs transition-colors"
+                                                >
+                                                    Reactivar pedido (a Pendiente)
+                                                </button>
+                                            </div>
+                                        )}
+
                                         {order.status === 'PENDING_WHATSAPP' && (
                                             <div className="grid grid-cols-2 gap-3 pt-1">
                                                 <button
                                                     type="button"
-                                                    onClick={() =>
+                                                    onClick={() => {
+                                                        setConfirmError(null);
                                                         setConfirmState({
                                                             orderId: order.id,
                                                             customerName: order.customer_name,
+                                                            fromStatus: 'PENDING_WHATSAPP',
                                                             status: 'CANCELLED',
-                                                        })
-                                                    }
+                                                        });
+                                                    }}
                                                     className="border-red-200 bg-red-50 text-red-700 hover:bg-red-100 cursor-pointer rounded-xl py-2.5 font-serif text-xs font-bold shadow-xs transition-colors"
                                                 >
                                                     Rechazar
                                                 </button>
                                                 <button
                                                     type="button"
-                                                    onClick={() =>
+                                                    onClick={() => {
+                                                        setConfirmError(null);
                                                         setConfirmState({
                                                             orderId: order.id,
                                                             customerName: order.customer_name,
+                                                            fromStatus: 'PENDING_WHATSAPP',
                                                             status: 'CONFIRMED',
-                                                        })
-                                                    }
+                                                        });
+                                                    }}
                                                     className="bg-forest hover:bg-forest-light text-white cursor-pointer rounded-xl py-2.5 font-serif text-xs font-bold shadow-xs transition-colors"
                                                 >
                                                     Aceptar y Confirmar
@@ -421,26 +533,10 @@ export function Index({ orders, filters, counts }: IndexProps) {
                 </div>
 
                 {/* Pagination */}
-                {orders.links.length > 3 && (
-                    <div className="flex flex-wrap items-center justify-center gap-1.5 pt-4">
-                        {orders.links.map((link, idx) => (
-                            <Link
-                                key={idx}
-                                href={link.url || '#'}
-                                preserveScroll
-                                preserveState
-                                className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-                                    link.active
-                                        ? 'bg-forest text-white font-bold'
-                                        : link.url
-                                        ? 'bg-paper border-paper-dark hover:bg-paper-dark text-ink border'
-                                        : 'text-stone-400 cursor-not-allowed'
-                                }`}
-                                dangerouslySetInnerHTML={{ __html: link.label }}
-                            />
-                        ))}
-                    </div>
-                )}
+                <PaginationLinks
+                    links={orders.links}
+                    className="flex flex-wrap items-center justify-center gap-1.5 pt-4"
+                />
             </div>
 
             {/* Status Update Confirmation Modal */}
@@ -450,17 +546,35 @@ export function Index({ orders, filters, counts }: IndexProps) {
                         <h3 className="text-ink font-serif text-lg font-bold">
                             {confirmState.status === 'CONFIRMED'
                                 ? '¿Confirmar pedido?'
-                                : '¿Cancelar pedido?'}
+                                : confirmState.status === 'PENDING_WHATSAPP'
+                                  ? confirmState.fromStatus === 'CONFIRMED'
+                                      ? '¿Revertir confirmación?'
+                                      : '¿Reactivar pedido?'
+                                  : '¿Cancelar pedido?'}
                         </h3>
                         <p className="text-ink-muted text-xs leading-relaxed">
                             {confirmState.status === 'CONFIRMED'
-                                ? `Se marcará el pedido de ${confirmState.customerName} como confirmado.`
-                                : `Se cancelará el pedido de ${confirmState.customerName}.`}
+                                ? `Se marcará el pedido de ${confirmState.customerName} como confirmado y se descontará automáticamente el stock de los productos vendidos en el inventario.`
+                                : confirmState.status === 'PENDING_WHATSAPP'
+                                  ? confirmState.fromStatus === 'CONFIRMED'
+                                      ? `El pedido de ${confirmState.customerName} volverá a Pendiente y se repondrá el stock previamente descontado.`
+                                      : `El pedido de ${confirmState.customerName} volverá a Pendiente para coordinar nuevamente por WhatsApp (sin descontar stock aún).`
+                                  : confirmState.fromStatus === 'CONFIRMED'
+                                    ? `El pedido de ${confirmState.customerName} se cancelará y se repondrá el stock previamente descontado en el inventario.`
+                                    : `El pedido de ${confirmState.customerName} pasará a la sección de Cancelados sin descontar stock del inventario.`}
                         </p>
+                        {confirmError && (
+                            <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-700">
+                                {confirmError}
+                            </div>
+                        )}
                         <div className="flex items-center justify-end gap-2 pt-2">
                             <button
                                 type="button"
-                                onClick={() => setConfirmState(null)}
+                                onClick={() => {
+                                    setConfirmState(null);
+                                    setConfirmError(null);
+                                }}
                                 disabled={isProcessing}
                                 className="border-stone-300 text-ink hover:bg-paper-dark rounded-xl border px-3 py-2 text-xs font-semibold transition-colors"
                             >
@@ -477,38 +591,6 @@ export function Index({ orders, filters, counts }: IndexProps) {
                                 }`}
                             >
                                 {isProcessing ? 'Procesando...' : 'Confirmar'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Delete Confirmation Modal */}
-            {deleteState && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/50 p-4 backdrop-blur-xs animate-fade-in">
-                    <div className="bg-paper border-paper-dark w-full max-w-sm space-y-4 rounded-2xl border p-6 shadow-2xl">
-                        <h3 className="text-ink font-serif text-lg font-bold">
-                            ¿Eliminar registro de pedido?
-                        </h3>
-                        <p className="text-ink-muted text-xs leading-relaxed">
-                            Esta acción eliminará permanentemente la orden de {deleteState.customerName} del sistema.
-                        </p>
-                        <div className="flex items-center justify-end gap-2 pt-2">
-                            <button
-                                type="button"
-                                onClick={() => setDeleteState(null)}
-                                disabled={isProcessing}
-                                className="border-stone-300 text-ink hover:bg-paper-dark rounded-xl border px-3 py-2 text-xs font-semibold transition-colors"
-                            >
-                                Volver
-                            </button>
-                            <button
-                                type="button"
-                                onClick={handleDeleteOrder}
-                                disabled={isProcessing}
-                                className="bg-red-600 hover:bg-red-700 rounded-xl px-4 py-2 text-xs font-bold text-white transition-colors cursor-pointer"
-                            >
-                                {isProcessing ? 'Eliminando...' : 'Eliminar Pedido'}
                             </button>
                         </div>
                     </div>

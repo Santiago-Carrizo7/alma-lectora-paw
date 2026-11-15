@@ -1,5 +1,6 @@
 import { Head, Link, useForm } from '@inertiajs/react';
 import React, { useState } from 'react';
+import { ImageGalleryUpload } from '../../../components/admin/image-gallery-upload';
 import { AdminLayout } from '../../../layouts/admin-layout';
 import { formatPrice } from '../../../lib/price';
 
@@ -28,6 +29,7 @@ interface ComboItem {
     promo_price: number | string | null;
     stock: number;
     cover_url: string | null;
+    additional_images?: string[];
     is_active: boolean;
     books?: LinkedItem[];
     accessories?: LinkedItem[];
@@ -63,8 +65,9 @@ export function Form({ combo, availableBooks, availableAccessories }: FormProps)
         price: combo?.price !== undefined ? String(combo.price) : '',
         promo_quantity: combo?.promo_quantity ? String(combo.promo_quantity) : '',
         promo_price: combo?.promo_price ? String(combo.promo_price) : '',
-        stock: combo?.stock !== undefined ? combo.stock : 0,
+        stock: combo?.stock !== undefined ? String(combo.stock) : '0',
         cover_url: combo?.cover_url || '',
+        additional_images: (combo?.additional_images || []) as string[],
         description: combo?.description || '',
         is_active: combo ? combo.is_active : true,
         books: initialBooks,
@@ -189,7 +192,7 @@ export function Form({ combo, availableBooks, availableAccessories }: FormProps)
                         {/* Price */}
                         <div className="space-y-1.5">
                             <label className="text-ink-muted text-xs font-bold tracking-wider uppercase">
-                                Precio Combo ($) <span className="text-red-600">*</span>
+                                Precio ($) <span className="text-red-600">*</span>
                             </label>
                             <input
                                 type="number"
@@ -213,7 +216,7 @@ export function Form({ combo, availableBooks, availableAccessories }: FormProps)
                                 type="number"
                                 min="0"
                                 value={form.data.stock}
-                                onChange={(e) => form.setData('stock', parseInt(e.target.value, 10) || 0)}
+                                onChange={(e) => form.setData('stock', e.target.value)}
                                 className="bg-paper focus:ring-forest/40 focus:border-forest text-ink w-full rounded-xl border border-stone-300 px-3.5 py-2.5 font-mono text-xs focus:ring-2"
                                 required
                             />
@@ -448,37 +451,16 @@ export function Form({ combo, availableBooks, availableAccessories }: FormProps)
                     </h3>
 
                     <div className="space-y-4">
-                        {/* Cover URL */}
-                        <div className="space-y-1.5">
-                            <label className="text-ink-muted text-xs font-bold tracking-wider uppercase">
-                                URL de Portada / Imagen
-                            </label>
-                            <input
-                                type="url"
-                                value={form.data.cover_url}
-                                onChange={(e) => form.setData('cover_url', e.target.value)}
-                                placeholder="https://images.unsplash.com/... o https://ejemplo.com/combo.jpg"
-                                className="bg-paper focus:ring-forest/40 focus:border-forest text-ink w-full rounded-xl border border-stone-300 px-3.5 py-2.5 font-mono text-xs focus:ring-2"
-                            />
-                            {form.errors.cover_url && <p className="text-xs font-medium text-red-600">{form.errors.cover_url}</p>}
-                        </div>
-
-                        {/* Preview */}
-                        {form.data.cover_url && (
-                            <div className="bg-paper-dark/30 border-paper-dark/70 flex items-center gap-4 rounded-xl border p-3">
-                                <img
-                                    src={form.data.cover_url}
-                                    alt="Vista previa"
-                                    className="border-paper-dark/80 h-16 w-14 shrink-0 rounded-lg border object-cover shadow-2xs"
-                                    onError={(e) => {
-                                        (e.target as HTMLImageElement).style.display = 'none';
-                                    }}
-                                />
-                                <div className="text-ink-muted text-xs">
-                                    <p className="text-ink font-semibold">Vista previa de imagen</p>
-                                    <p className="text-[11px] text-stone-400">La imagen se renderizará en la sección de combos y el carrito.</p>
-                                </div>
-                            </div>
+                        {/* Image Gallery Upload (3 slots) */}
+                        <ImageGalleryUpload
+                            coverUrl={form.data.cover_url}
+                            additionalImages={form.data.additional_images}
+                            onCoverChange={(url) => form.setData('cover_url', url)}
+                            onAdditionalImagesChange={(images) => form.setData('additional_images', images)}
+                            disabled={form.processing}
+                        />
+                        {form.errors.cover_url && (
+                            <p className="text-xs font-medium text-red-600">{form.errors.cover_url}</p>
                         )}
 
                         {/* Active Checkbox */}

@@ -1,6 +1,8 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 import { QuickStockModal } from '../../../components/admin/quick-stock-modal';
+import { PaginationLinks } from '../../../components/ui/pagination-links';
+import { SafeImage } from '../../../components/ui/safe-image';
 import { AdminLayout } from '../../../layouts/admin-layout';
 import { formatPrice } from '../../../lib/price';
 import type { PaginatedData } from '../../../types/alma';
@@ -33,6 +35,8 @@ interface IndexProps {
     filters: {
         search: string;
         category: string;
+        stock_status?: string;
+        sort?: string;
         tab: 'available' | 'archived';
     };
     counts: {
@@ -50,41 +54,70 @@ interface ConfirmState {
 export function Index({ accessories, filters, counts, categories }: IndexProps) {
     const [search, setSearch] = useState(filters.search || '');
     const [selectedCategory, setSelectedCategory] = useState(filters.category || '');
+    const [stockStatus, setStockStatus] = useState(filters.stock_status || '');
+    const [sort, setSort] = useState(filters.sort || '');
     const [selectedForStock, setSelectedForStock] = useState<AccessoryItem | null>(null);
     const [isStockOpen, setIsStockOpen] = useState(false);
     const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
 
+    const applyFilters = (overrides: Partial<{ search: string; category: string; stock_status: string; sort: string; tab: 'available' | 'archived' }> = {}) => {
+        const nextParams = {
+            search: overrides.search !== undefined ? overrides.search : search,
+            category: overrides.category !== undefined ? overrides.category : selectedCategory,
+            stock_status: overrides.stock_status !== undefined ? overrides.stock_status : stockStatus,
+            sort: overrides.sort !== undefined ? overrides.sort : sort,
+            tab: overrides.tab !== undefined ? overrides.tab : filters.tab,
+        };
+        router.get('/admin/accesorios', nextParams, { preserveState: true, replace: true, preserveScroll: true });
+    };
+
     // Debounced search
     useEffect(() => {
         const timer = setTimeout(() => {
             if (search !== (filters.search || '')) {
-                router.get(
-                    '/admin/accesorios',
-                    { search, category: selectedCategory, tab: filters.tab },
-                    { preserveState: true, replace: true, preserveScroll: true },
-                );
+                applyFilters({ search });
             }
         }, 350);
         return () => clearTimeout(timer);
-    }, [search, selectedCategory, filters.search, filters.tab]);
+    }, [search, selectedCategory, stockStatus, sort, filters.search, filters.tab]);
 
     const handleCategorySelect = (catSlug: string) => {
         setSelectedCategory(catSlug);
-        router.get(
-            '/admin/accesorios',
-            { search, category: catSlug, tab: filters.tab },
-            { preserveState: true, replace: true, preserveScroll: true },
-        );
+        applyFilters({ category: catSlug });
+    };
+
+    const handleStockStatusChange = (nextStockStatus: string) => {
+        setStockStatus(nextStockStatus);
+        applyFilters({ stock_status: nextStockStatus });
+    };
+
+    const handleSortChange = (nextSort: string) => {
+        setSort(nextSort);
+        applyFilters({ sort: nextSort });
+    };
+
+    const handleColumnSort = (column: 'price' | 'stock') => {
+        const asc = `${column}_asc`;
+        const desc = `${column}_desc`;
+        const nextSort = sort === asc ? desc : asc;
+        handleSortChange(nextSort);
+    };
+
+    const handleClearFilters = () => {
+        setSearch('');
+        setSelectedCategory('');
+        setStockStatus('');
+        setSort('');
+        router.get('/admin/accesorios', { tab: filters.tab }, { preserveState: true, replace: true, preserveScroll: true });
     };
 
     const handleTabChange = (tab: 'available' | 'archived') => {
-        router.get(
-            '/admin/accesorios',
-            { search, category: selectedCategory, tab },
-            { preserveState: true, replace: true, preserveScroll: true },
-        );
+        applyFilters({ tab });
     };
+
+    const hasActiveFilters = Boolean(search || selectedCategory || stockStatus || sort);
+    const isFilteredForExport = Boolean(search || selectedCategory || stockStatus || filters.tab === 'archived');
 
     const handleToggleActive = (accessory: AccessoryItem) => {
         router.patch(
@@ -97,19 +130,25 @@ export function Index({ accessories, filters, counts, categories }: IndexProps) 
     const handleSaveStock = async (newStock: number) => {
         if (!selectedForStock) return;
         setIsProcessing(true);
-        router.patch(
-            `/admin/accesorios/${selectedForStock.id}/stock`,
-            { stock: newStock },
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    setIsProcessing(false);
-                    setIsStockOpen(false);
-                    setSelectedForStock(null);
+        return new Promise<void>((resolve, reject) => {
+            router.patch(
+                `/admin/accesorios/${selectedForStock.id}/stock`,
+                { stock: newStock },
+                {
+                    preserveScroll: true,
+                    onSuccess: () => {
+                        setIsProcessing(false);
+                        setIsStockOpen(false);
+                        setSelectedForStock(null);
+                        resolve();
+                    },
+                    onError: () => {
+                        setIsProcessing(false);
+                        reject(new Error('No se pudo actualizar el stock del accesorio.'));
+                    },
                 },
-                onError: () => setIsProcessing(false),
-            },
-        );
+            );
+        });
     };
 
     const handleConfirmAction = () => {
@@ -157,6 +196,8 @@ export function Index({ accessories, filters, counts, categories }: IndexProps) 
         const params = new URLSearchParams({
             search: search || '',
             category: selectedCategory || '',
+            stock_status: stockStatus || '',
+            sort: sort || '',
             tab: filters.tab || 'available',
         });
         window.location.href = `/admin/accesorios/export?${params.toString()}`;
@@ -174,12 +215,16 @@ export function Index({ accessories, filters, counts, categories }: IndexProps) 
                         type="button"
                         onClick={handleExportExcel}
                         className="border-paper-dark hover:bg-paper-dark/60 text-ink-muted hover:text-ink bg-paper inline-flex cursor-pointer items-center gap-1.5 rounded-xl border px-3.5 py-2.5 font-serif text-xs font-semibold shadow-xs transition-colors"
-                        title="Descargar catálogo de accesorios en Excel"
+                        title={
+                            isFilteredForExport
+                                ? 'Exportar vista filtrada actual en Excel'
+                                : 'Exportar reporte global completo (disponibles + archivados) en Excel'
+                        }
                     >
                         <svg className="h-4 w-4 text-emerald-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
-                        Exportar Excel
+                        {isFilteredForExport ? 'Exportar Vista Filtrada' : 'Exportar Excel (Global)'}
                     </button>
                     <Link
                         href="/admin/accesorios/nuevo"
@@ -280,6 +325,55 @@ export function Index({ accessories, filters, counts, categories }: IndexProps) 
                     ))}
                 </div>
 
+                {/* Combinable Filter & Sort Bar */}
+                <div className="bg-paper-dark/30 border-paper-dark flex flex-wrap items-center gap-3 rounded-xl border p-3 text-xs">
+                    <div className="flex items-center gap-1.5">
+                        <label htmlFor="acc-stock-filter" className="text-ink-muted font-semibold">
+                            Estado de Stock:
+                        </label>
+                        <select
+                            id="acc-stock-filter"
+                            value={stockStatus}
+                            onChange={(e) => handleStockStatusChange(e.target.value)}
+                            className="bg-paper border-stone-300 text-ink focus:border-forest rounded-lg border px-2.5 py-1.5 text-xs focus:outline-none"
+                        >
+                            <option value="">Todo el stock</option>
+                            <option value="in_stock">Con stock (&gt; 0)</option>
+                            <option value="low_stock">Stock crítico (1 a 3)</option>
+                            <option value="out_of_stock">Agotados (0)</option>
+                        </select>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                        <label htmlFor="acc-sort-select" className="text-ink-muted font-semibold">
+                            Ordenar por:
+                        </label>
+                        <select
+                            id="acc-sort-select"
+                            value={sort}
+                            onChange={(e) => handleSortChange(e.target.value)}
+                            className="bg-paper border-stone-300 text-ink focus:border-forest rounded-lg border px-2.5 py-1.5 text-xs focus:outline-none"
+                        >
+                            <option value="">Más recientes</option>
+                            <option value="price_asc">Precio: menor a mayor</option>
+                            <option value="price_desc">Precio: mayor a menor</option>
+                            <option value="stock_asc">Stock: menor a mayor</option>
+                            <option value="stock_desc">Stock: mayor a menor</option>
+                            <option value="title_asc">Título (A-Z)</option>
+                        </select>
+                    </div>
+
+                    {hasActiveFilters && (
+                        <button
+                            type="button"
+                            onClick={handleClearFilters}
+                            className="text-forest hover:bg-forest/10 ml-auto cursor-pointer rounded-lg px-2.5 py-1.5 text-xs font-bold transition-colors"
+                        >
+                            ✕ Limpiar filtros
+                        </button>
+                    )}
+                </div>
+
                 {/* Accessories Table (Identical Format to Books Table) */}
                 <div className="bg-paper border-paper-dark/80 overflow-hidden rounded-2xl border shadow-xs">
                     <div className="overflow-x-auto">
@@ -289,8 +383,32 @@ export function Index({ accessories, filters, counts, categories }: IndexProps) 
                                     <th className="w-14 px-3 py-3">Portada</th>
                                     <th className="px-3 py-3">Título / Info</th>
                                     <th className="w-28 px-3 py-3">Categoría</th>
-                                    <th className="w-28 px-3 py-3">Precio</th>
-                                    <th className="w-24 px-3 py-3 text-center">Stock</th>
+                                    <th className="w-28 px-3 py-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleColumnSort('price')}
+                                            className="hover:text-forest inline-flex cursor-pointer items-center gap-1 font-bold uppercase transition-colors"
+                                            title="Ordenar por precio"
+                                        >
+                                            <span>Precio</span>
+                                            <span className="text-xs">
+                                                {sort === 'price_asc' ? '↑' : sort === 'price_desc' ? '↓' : '↕'}
+                                            </span>
+                                        </button>
+                                    </th>
+                                    <th className="w-24 px-3 py-3 text-center">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleColumnSort('stock')}
+                                            className="hover:text-forest inline-flex cursor-pointer items-center gap-1 font-bold uppercase transition-colors"
+                                            title="Ordenar por stock"
+                                        >
+                                            <span>Stock</span>
+                                            <span className="text-xs">
+                                                {sort === 'stock_asc' ? '↑' : sort === 'stock_desc' ? '↓' : '↕'}
+                                            </span>
+                                        </button>
+                                    </th>
                                     <th className="w-24 px-3 py-3 text-center">Visibilidad</th>
                                     <th className="w-36 px-3 py-3 text-right">Acciones</th>
                                 </tr>
@@ -314,17 +432,16 @@ export function Index({ accessories, filters, counts, categories }: IndexProps) 
                                                 {/* Thumbnail */}
                                                 <td className="px-3 py-3">
                                                     <div className="border-paper-dark bg-paper-dark/40 h-14 w-10 shrink-0 overflow-hidden rounded-md border">
-                                                        {acc.cover_url ? (
-                                                            <img
-                                                                src={acc.cover_url}
-                                                                alt={acc.title}
-                                                                className="h-full w-full object-cover"
-                                                            />
-                                                        ) : (
-                                                            <div className="text-ink-muted flex h-full w-full items-center justify-center font-serif text-[9px] text-center">
-                                                                Sin Foto
-                                                            </div>
-                                                        )}
+                                                        <SafeImage
+                                                            src={acc.cover_url}
+                                                            alt={acc.title}
+                                                            className="h-full w-full object-cover"
+                                                            fallback={
+                                                                <div className="text-ink-muted flex h-full w-full items-center justify-center font-serif text-[9px] text-center">
+                                                                    Sin Foto
+                                                                </div>
+                                                            }
+                                                        />
                                                     </div>
                                                 </td>
 
@@ -478,36 +595,7 @@ export function Index({ accessories, filters, counts, categories }: IndexProps) 
                                 <span className="text-ink font-bold">{accessories.total}</span> accesorios
                             </div>
 
-                            <div className="flex items-center gap-1">
-                                {accessories.links.map((link, idx) => {
-                                    const cleanLabel = link.label
-                                        .replace('&laquo; Previous', '← Anterior')
-                                        .replace('Next &raquo;', 'Siguiente →');
-
-                                    if (!link.url) {
-                                        return (
-                                            <span
-                                                key={idx}
-                                                className="cursor-not-allowed rounded-lg px-3 py-1.5 text-stone-400 opacity-50 select-none"
-                                                dangerouslySetInnerHTML={{ __html: cleanLabel }}
-                                            />
-                                        );
-                                    }
-
-                                    return (
-                                        <Link
-                                            key={idx}
-                                            href={link.url}
-                                            preserveState
-                                            preserveScroll
-                                            className={`rounded-lg px-3 py-1.5 font-medium transition-colors ${
-                                                link.active ? 'bg-forest font-bold text-white' : 'hover:bg-paper-dark text-ink'
-                                            }`}
-                                            dangerouslySetInnerHTML={{ __html: cleanLabel }}
-                                        />
-                                    );
-                                })}
-                            </div>
+                            <PaginationLinks links={accessories.links} />
                         </div>
                     )}
                 </div>

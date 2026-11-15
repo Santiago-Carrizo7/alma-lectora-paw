@@ -36,8 +36,8 @@ class StoreBookRequest extends FormRequest
             'is_active' => ['nullable', 'boolean'],
             'published_date' => ['nullable', 'string', 'max:50'],
             'language' => ['nullable', 'string', 'max:10'],
-            'additional_images' => ['nullable', 'array'],
-            'additional_images.*' => ['string', 'max:2048'],
+            'additional_images' => ['nullable', 'array', 'max:3'],
+            'additional_images.*' => ['nullable', 'string', 'max:2048'],
             'authors' => ['nullable', 'array'],
             'authors.*' => ['required', 'string', 'max:255'],
         ];

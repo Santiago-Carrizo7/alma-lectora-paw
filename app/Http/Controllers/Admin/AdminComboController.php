@@ -9,6 +9,7 @@ use App\Models\Book;
 use App\Models\Combo;
 use App\Models\ComboAccessory;
 use App\Models\ComboBook;
+use App\Support\HtmlSanitizer;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -25,8 +26,10 @@ class AdminComboController extends Controller
     public function export(Request $request): BinaryFileResponse
     {
         $filters = [
-            'search' => $request->input('search', ''),
-            'tab' => $request->input('tab', 'available'),
+            'search' => (string) $request->input('search', ''),
+            'stock_status' => (string) $request->input('stock_status', ''),
+            'sort' => (string) $request->input('sort', ''),
+            'tab' => (string) $request->input('tab', ''),
         ];
 
         return Excel::download(new CombosExport($filters), 'catalogo-combos-alma-lectora.xlsx');
@@ -37,23 +40,23 @@ class AdminComboController extends Controller
      */
     public function index(Request $request): Response
     {
-        $tab = $request->input('tab', 'available');
+        $filters = [
+            'search' => (string) $request->input('search', ''),
+            'stock_status' => (string) $request->input('stock_status', ''),
+            'sort' => (string) $request->input('sort', ''),
+            'tab' => (string) $request->input('tab', 'available'),
+        ];
 
-        $query = $tab === 'archived'
+        $query = $filters['tab'] === 'archived'
             ? Combo::onlyTrashed()->with(['books.book', 'accessories.accessory'])
             : Combo::withoutTrashed()->with(['books.book', 'accessories.accessory']);
 
-        $search = $request->input('search');
-        if ($search) {
-            $like = $query->getConnection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
-            $query->where(function ($q) use ($search, $like) {
-                $q->where('title', $like, "%{$search}%")
-                  ->orWhere('description', $like, "%{$search}%");
-            });
+        $query->filter($filters);
+        if (empty($filters['sort'])) {
+            $query->latest();
         }
 
         $combos = $query
-            ->latest()
             ->paginate(10)
             ->withQueryString();
 
@@ -64,10 +67,7 @@ class AdminComboController extends Controller
 
         return Inertia::render('Admin/Combos/Index', [
             'combos' => $combos,
-            'filters' => [
-                'search' => $search ?? '',
-                'tab' => $tab,
-            ],
+            'filters' => $filters,
             'counts' => $counts,
         ]);
     }
@@ -99,7 +99,8 @@ class AdminComboController extends Controller
             'promo_price' => 'nullable|numeric|min:0',
             'stock' => 'required|integer|min:0',
             'cover_url' => 'nullable|string|max:1000',
-            'additional_images' => 'nullable|array',
+            'additional_images' => 'nullable|array|max:3',
+            'additional_images.*' => 'nullable|string|max:2048',
             'is_active' => 'boolean',
             'books' => 'nullable|array',
             'books.*.id' => 'required|uuid|exists:books,id',
@@ -112,13 +113,13 @@ class AdminComboController extends Controller
         DB::transaction(function () use ($validated) {
             $combo = Combo::create([
                 'title' => $validated['title'],
-                'description' => $validated['description'] ?? null,
+                'description' => HtmlSanitizer::clean($validated['description'] ?? null),
                 'price' => $validated['price'],
                 'promo_quantity' => $validated['promo_quantity'] ?? null,
                 'promo_price' => $validated['promo_price'] ?? null,
                 'stock' => $validated['stock'],
                 'cover_url' => $validated['cover_url'] ?? null,
-                'additional_images' => $validated['additional_images'] ?? [],
+                'additional_images' => array_values(array_filter($validated['additional_images'] ?? [], fn ($u) => is_string($u) && trim($u) !== '')),
                 'is_active' => $validated['is_active'] ?? true,
             ]);
 
@@ -175,7 +176,8 @@ class AdminComboController extends Controller
             'promo_price' => 'nullable|numeric|min:0',
             'stock' => 'required|integer|min:0',
             'cover_url' => 'nullable|string|max:1000',
-            'additional_images' => 'nullable|array',
+            'additional_images' => 'nullable|array|max:3',
+            'additional_images.*' => 'nullable|string|max:2048',
             'is_active' => 'boolean',
             'books' => 'nullable|array',
             'books.*.id' => 'required|uuid|exists:books,id',
@@ -185,16 +187,21 @@ class AdminComboController extends Controller
             'accessories.*.quantity' => 'required|integer|min:1',
         ]);
 
+        $previousImages = array_filter(array_merge(
+            [$combo->cover_url],
+            is_array($combo->additional_images) ? $combo->additional_images : []
+        ));
+
         DB::transaction(function () use ($combo, $validated) {
             $combo->update([
                 'title' => $validated['title'],
-                'description' => $validated['description'] ?? null,
+                'description' => HtmlSanitizer::clean($validated['description'] ?? null),
                 'price' => $validated['price'],
                 'promo_quantity' => $validated['promo_quantity'] ?? null,
                 'promo_price' => $validated['promo_price'] ?? null,
                 'stock' => $validated['stock'],
                 'cover_url' => $validated['cover_url'] ?? null,
-                'additional_images' => $validated['additional_images'] ?? [],
+                'additional_images' => array_values(array_filter($validated['additional_images'] ?? [], fn ($u) => is_string($u) && trim($u) !== '')),
                 'is_active' => $validated['is_active'] ?? true,
             ]);
 
@@ -220,6 +227,15 @@ class AdminComboController extends Controller
                 }
             }
         });
+
+        $combo->refresh();
+        $currentImages = array_filter(array_merge(
+            [$combo->cover_url],
+            is_array($combo->additional_images) ? $combo->additional_images : []
+        ));
+        foreach (array_diff($previousImages, $currentImages) as $removedUrl) {
+            AdminMediaController::deleteLocalUploadIfUnused($removedUrl);
+        }
 
         return redirect()->route('admin.combos.index')->with('success', 'Combo promocional actualizado con éxito.');
     }
@@ -275,7 +291,16 @@ class AdminComboController extends Controller
     public function forceDestroy(string $id): RedirectResponse
     {
         $combo = Combo::withTrashed()->findOrFail($id);
+        $images = array_filter(array_merge(
+            [$combo->cover_url],
+            is_array($combo->additional_images) ? $combo->additional_images : []
+        ));
+
         $combo->forceDelete();
+
+        foreach ($images as $url) {
+            AdminMediaController::deleteLocalUploadIfUnused($url);
+        }
 
         return back()->with('success', 'Combo eliminado definitivamente.');
     }

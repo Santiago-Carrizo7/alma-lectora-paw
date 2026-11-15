@@ -6,9 +6,6 @@ interface StoreConfigData {
     id: string;
     whatsapp_phone: string;
     instagram_url: string | null;
-    shipping_cost: number | string;
-    free_shipping_min: number | string;
-    banner_message: string | null;
     is_store_open: boolean;
 }
 
@@ -32,9 +29,6 @@ export function Index({ config, categories, genres }: IndexProps) {
     const configForm = useForm({
         whatsapp_phone: config.whatsapp_phone || '',
         instagram_url: config.instagram_url || '',
-        shipping_cost: config.shipping_cost !== undefined ? String(config.shipping_cost) : '0',
-        free_shipping_min: config.free_shipping_min !== undefined ? String(config.free_shipping_min) : '0',
-        banner_message: config.banner_message || '',
         is_store_open: config.is_store_open ?? true,
     });
 
@@ -45,6 +39,8 @@ export function Index({ config, categories, genres }: IndexProps) {
 
     // Genre edit & delete modal states
     const [newGenreInput, setNewGenreInput] = useState('');
+    const [genreError, setGenreError] = useState<string | null>(null);
+    const [editGenreError, setEditGenreError] = useState<string | null>(null);
     const [editingGenre, setEditingGenre] = useState<{ oldName: string; newName: string } | null>(null);
     const [deletingGenre, setDeletingGenre] = useState<string | null>(null);
     const [isProcessingGenre, setIsProcessingGenre] = useState(false);
@@ -89,20 +85,24 @@ export function Index({ config, categories, genres }: IndexProps) {
         e.preventDefault();
         if (!newGenreInput.trim()) return;
 
+        setGenreError(null);
         setIsProcessingGenre(true);
-        router.put(
+        router.post(
             '/admin/configuracion/generos',
             {
-                old_name: newGenreInput.trim(),
-                new_name: newGenreInput.trim(),
+                name: newGenreInput.trim(),
             },
             {
                 preserveScroll: true,
                 onSuccess: () => {
                     setNewGenreInput('');
+                    setGenreError(null);
                     setIsProcessingGenre(false);
                 },
-                onError: () => setIsProcessingGenre(false),
+                onError: (errors) => {
+                    setGenreError(errors.name || Object.values(errors)[0] || 'No se pudo agregar el género.');
+                    setIsProcessingGenre(false);
+                },
             },
         );
     };
@@ -110,6 +110,7 @@ export function Index({ config, categories, genres }: IndexProps) {
     const handleSaveEditedGenre = () => {
         if (!editingGenre || !editingGenre.newName.trim()) return;
 
+        setEditGenreError(null);
         setIsProcessingGenre(true);
         router.put(
             '/admin/configuracion/generos',
@@ -121,9 +122,15 @@ export function Index({ config, categories, genres }: IndexProps) {
                 preserveScroll: true,
                 onSuccess: () => {
                     setEditingGenre(null);
+                    setEditGenreError(null);
                     setIsProcessingGenre(false);
                 },
-                onError: () => setIsProcessingGenre(false),
+                onError: (errors) => {
+                    setEditGenreError(
+                        errors.new_name || errors.old_name || Object.values(errors)[0] || 'No se pudo actualizar el género.',
+                    );
+                    setIsProcessingGenre(false);
+                },
             },
         );
     };
@@ -163,7 +170,7 @@ export function Index({ config, categories, genres }: IndexProps) {
                             Operaciones & Configuración General
                         </h3>
                         <p className="text-ink-muted text-xs">
-                            Redes sociales, WhatsApp de atención, logística de envíos y estado del checkout.
+                            Redes sociales, WhatsApp de atención y estado operativo del checkout.
                         </p>
                     </div>
 
@@ -203,65 +210,8 @@ export function Index({ config, categories, genres }: IndexProps) {
                         </div>
                     </div>
 
-                    {/* Logística de Envíos */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
-                        <div>
-                            <label className="text-ink text-xs font-semibold uppercase tracking-wider block mb-1">
-                                Costo Base de Envío ($ ARS) *
-                            </label>
-                            <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                required
-                                value={configForm.data.shipping_cost}
-                                onChange={(e) => configForm.setData('shipping_cost', e.target.value)}
-                                placeholder="0.00"
-                                className="bg-paper border-paper-dark focus:border-forest text-ink w-full rounded-xl border px-3.5 py-2.5 text-sm font-mono font-bold shadow-xs focus:ring-1 focus:ring-forest focus:outline-none"
-                            />
-                            {configForm.errors.shipping_cost && (
-                                <p className="mt-1 text-xs text-red-600">{configForm.errors.shipping_cost}</p>
-                            )}
-                        </div>
-
-                        <div>
-                            <label className="text-ink text-xs font-semibold uppercase tracking-wider block mb-1">
-                                Mínimo de Compra para Envío Gratis ($ ARS) *
-                            </label>
-                            <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                required
-                                value={configForm.data.free_shipping_min}
-                                onChange={(e) => configForm.setData('free_shipping_min', e.target.value)}
-                                placeholder="0.00"
-                                className="bg-paper border-paper-dark focus:border-forest text-ink w-full rounded-xl border px-3.5 py-2.5 text-sm font-mono font-bold shadow-xs focus:ring-1 focus:ring-forest focus:outline-none"
-                            />
-                            {configForm.errors.free_shipping_min && (
-                                <p className="mt-1 text-xs text-red-600">{configForm.errors.free_shipping_min}</p>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Marquesina y Estado Operativo */}
+                    {/* Estado Operativo */}
                     <div className="space-y-4 pt-1">
-                        <div>
-                            <label className="text-ink text-xs font-semibold uppercase tracking-wider block mb-1">
-                                Mensaje del Banner Informativo / Marquesina
-                            </label>
-                            <textarea
-                                rows={2}
-                                value={configForm.data.banner_message}
-                                onChange={(e) => configForm.setData('banner_message', e.target.value)}
-                                placeholder="Ingresá un mensaje informativo para los clientes o dejalo vacío..."
-                                className="bg-paper border-paper-dark focus:border-forest text-ink w-full rounded-xl border px-3.5 py-2.5 text-sm shadow-xs focus:ring-1 focus:ring-forest focus:outline-none resize-y"
-                            />
-                            {configForm.errors.banner_message && (
-                                <p className="mt-1 text-xs text-red-600">{configForm.errors.banner_message}</p>
-                            )}
-                        </div>
-
                         <div className="bg-paper border-stone-300 flex flex-col sm:flex-row items-start sm:items-center justify-between rounded-xl border p-4 gap-3">
                             <div className="space-y-0.5">
                                 <label
@@ -394,7 +344,10 @@ export function Index({ config, categories, genres }: IndexProps) {
                             <input
                                 type="text"
                                 value={newGenreInput}
-                                onChange={(e) => setNewGenreInput(e.target.value)}
+                                onChange={(e) => {
+                                    setNewGenreInput(e.target.value);
+                                    if (genreError) setGenreError(null);
+                                }}
                                 placeholder="Nombre de nuevo género (ej: Realismo Mágico)"
                                 className="bg-paper-dark border-stone-300 text-ink flex-1 rounded-lg border p-2 text-xs font-semibold focus:outline-none"
                             />
@@ -406,6 +359,9 @@ export function Index({ config, categories, genres }: IndexProps) {
                                 {isProcessingGenre ? 'Guardando...' : '+ Agregar Género'}
                             </button>
                         </form>
+                        {genreError && (
+                            <p className="text-xs font-medium text-red-600">{genreError}</p>
+                        )}
 
                         <div className="flex flex-wrap gap-2 pt-1">
                             {genres.length === 0 ? (
@@ -420,7 +376,10 @@ export function Index({ config, categories, genres }: IndexProps) {
                                         <div className="flex items-center gap-1 border-stone-200 border-l pl-1.5">
                                             <button
                                                 type="button"
-                                                onClick={() => setEditingGenre({ oldName: genre, newName: genre })}
+                                                onClick={() => {
+                                                    setEditGenreError(null);
+                                                    setEditingGenre({ oldName: genre, newName: genre });
+                                                }}
                                                 className="text-stone-400 hover:text-forest cursor-pointer p-0.5 text-xs"
                                                 title="Renombrar género en los libros"
                                             >
@@ -454,9 +413,15 @@ export function Index({ config, categories, genres }: IndexProps) {
                         <input
                             type="text"
                             value={editingGenre.newName}
-                            onChange={(e) => setEditingGenre({ ...editingGenre, newName: e.target.value })}
+                            onChange={(e) => {
+                                setEditingGenre({ ...editingGenre, newName: e.target.value });
+                                if (editGenreError) setEditGenreError(null);
+                            }}
                             className="bg-paper-dark border-paper-dark focus:border-forest text-ink w-full rounded-xl border px-3 py-2 text-sm focus:outline-none"
                         />
+                        {editGenreError && (
+                            <p className="text-xs font-medium text-red-600">{editGenreError}</p>
+                        )}
                         <div className="flex items-center justify-end gap-2 pt-2">
                             <button
                                 type="button"
