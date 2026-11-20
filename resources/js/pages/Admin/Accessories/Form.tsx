@@ -203,6 +203,7 @@ export function Form({ accessory, categories }: FormProps) {
                                 placeholder="Ej. 3 para 3x2"
                                 className="bg-paper focus:ring-forest/40 focus:border-forest text-ink w-full rounded-xl border border-stone-300 px-3.5 py-2.5 font-mono text-xs focus:ring-2"
                             />
+                            {form.errors.promo_quantity && <p className="text-xs font-medium text-red-600">{form.errors.promo_quantity}</p>}
                         </div>
 
                         {/* Promo Price */}
@@ -219,6 +220,7 @@ export function Form({ accessory, categories }: FormProps) {
                                 placeholder="Ej. 11000"
                                 className="bg-paper focus:ring-forest/40 focus:border-forest text-ink w-full rounded-xl border border-stone-300 px-3.5 py-2.5 font-mono text-xs focus:ring-2"
                             />
+                            {form.errors.promo_price && <p className="text-xs font-medium text-red-600">{form.errors.promo_price}</p>}
                         </div>
                     </div>
                 </div>

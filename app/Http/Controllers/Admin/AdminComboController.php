@@ -10,6 +10,7 @@ use App\Models\Combo;
 use App\Models\ComboAccessory;
 use App\Models\ComboBook;
 use App\Support\HtmlSanitizer;
+use App\Support\PromoPricing;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -95,8 +96,14 @@ class AdminComboController extends Controller
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
             'price' => 'required|numeric|min:0',
-            'promo_quantity' => 'nullable|integer|min:1',
-            'promo_price' => 'nullable|numeric|min:0',
+            'promo_quantity' => 'nullable|integer|min:1|required_with:promo_price',
+            'promo_price' => [
+                'nullable',
+                'numeric',
+                'min:0',
+                'required_with:promo_quantity',
+                PromoPricing::rule($request->input('price'), $request->input('promo_quantity')),
+            ],
             'stock' => 'required|integer|min:0',
             'cover_url' => 'nullable|string|max:1000',
             'additional_images' => 'nullable|array|max:3',
@@ -108,7 +115,7 @@ class AdminComboController extends Controller
             'accessories' => 'nullable|array',
             'accessories.*.id' => 'required|uuid|exists:accessories,id',
             'accessories.*.quantity' => 'required|integer|min:1',
-        ]);
+        ], PromoPricing::messages());
 
         DB::transaction(function () use ($validated) {
             $combo = Combo::create([
@@ -172,8 +179,14 @@ class AdminComboController extends Controller
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
             'price' => 'required|numeric|min:0',
-            'promo_quantity' => 'nullable|integer|min:1',
-            'promo_price' => 'nullable|numeric|min:0',
+            'promo_quantity' => 'nullable|integer|min:1|required_with:promo_price',
+            'promo_price' => [
+                'nullable',
+                'numeric',
+                'min:0',
+                'required_with:promo_quantity',
+                PromoPricing::rule($request->input('price'), $request->input('promo_quantity')),
+            ],
             'stock' => 'required|integer|min:0',
             'cover_url' => 'nullable|string|max:1000',
             'additional_images' => 'nullable|array|max:3',
@@ -185,7 +198,7 @@ class AdminComboController extends Controller
             'accessories' => 'nullable|array',
             'accessories.*.id' => 'required|uuid|exists:accessories,id',
             'accessories.*.quantity' => 'required|integer|min:1',
-        ]);
+        ], PromoPricing::messages());
 
         $previousImages = array_filter(array_merge(
             [$combo->cover_url],

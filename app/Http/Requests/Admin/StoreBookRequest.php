@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Admin;
 
+use App\Support\PromoPricing;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreBookRequest extends FormRequest
@@ -31,8 +32,14 @@ class StoreBookRequest extends FormRequest
             'synopsis' => ['nullable', 'string'],
             'cover_url' => ['nullable', 'string', 'max:2048'],
             'badge' => ['nullable', 'string', 'max:50'],
-            'promo_quantity' => ['nullable', 'integer', 'min:2'],
-            'promo_price' => ['nullable', 'numeric', 'min:0'],
+            'promo_quantity' => ['nullable', 'integer', 'min:2', 'required_with:promo_price'],
+            'promo_price' => [
+                'nullable',
+                'numeric',
+                'min:0',
+                'required_with:promo_quantity',
+                PromoPricing::rule($this->input('price'), $this->input('promo_quantity')),
+            ],
             'is_active' => ['nullable', 'boolean'],
             'published_date' => ['nullable', 'string', 'max:50'],
             'language' => ['nullable', 'string', 'max:10'],
@@ -58,6 +65,7 @@ class StoreBookRequest extends FormRequest
             'stock.required' => 'El stock es obligatorio.',
             'stock.integer' => 'El stock debe ser un número entero.',
             'stock.min' => 'El stock no puede ser negativo.',
+            ...PromoPricing::messages(),
         ];
     }
 }

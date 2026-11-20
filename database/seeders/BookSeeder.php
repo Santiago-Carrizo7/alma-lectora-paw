@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Author;
 use App\Models\Book;
+use App\Support\PromoPricing;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
@@ -65,8 +66,8 @@ class BookSeeder extends Seeder
                         'cover_url' => $item['coverUrl'] ?? null,
                         'additional_images' => $item['additionalImages'] ?? [],
                         'price' => $item['price'] ?? 0,
-                        'promo_quantity' => $item['promoQuantity'] ?? null,
-                        'promo_price' => $item['promoPrice'] ?? null,
+                        // Drop promotions that would cost more than the regular price.
+                        ...PromoPricing::sanitize($item['price'] ?? 0, $item['promoQuantity'] ?? null, $item['promoPrice'] ?? null),
                         'stock' => $existing ? $existing->stock : $variedStock,
                         'badge' => $item['badge'] ?? null,
                         'genre' => $item['genre'] ?? null,
@@ -318,8 +319,7 @@ class BookSeeder extends Seeder
                     'synopsis' => $item['synopsis'],
                     'cover_url' => $coverUrl,
                     'additional_images' => [],
-                    'promo_quantity' => $item['promo_quantity'],
-                    'promo_price' => $item['promo_price'],
+                    ...PromoPricing::sanitize($item['price'], $item['promo_quantity'], $item['promo_price']),
                     'language' => 'es',
                     'published_date' => '2023',
                     'is_active' => true,

@@ -7,6 +7,7 @@ use App\Models\Book;
 use App\Models\Combo;
 use App\Models\ComboAccessory;
 use App\Models\ComboBook;
+use App\Support\PromoPricing;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\File;
 
@@ -30,8 +31,8 @@ class ComboSeeder extends Seeder
                         'title' => $c['title'],
                         'description' => $c['description'] ?? null,
                         'price' => $c['price'] ?? 0,
-                        'promo_quantity' => $c['promoQuantity'] ?? null,
-                        'promo_price' => $c['promoPrice'] ?? null,
+                        // Drop promotions that would cost more than the regular price.
+                        ...PromoPricing::sanitize($c['price'] ?? 0, $c['promoQuantity'] ?? null, $c['promoPrice'] ?? null),
                         'cover_url' => $c['coverUrl'] ?? null,
                         'additional_images' => $c['additionalImages'] ?? [],
                         'stock' => $c['stock'] ?? 0,

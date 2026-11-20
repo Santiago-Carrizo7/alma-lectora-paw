@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Accessory;
 use App\Models\AccessoryCategory;
+use App\Support\PromoPricing;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\File;
 
@@ -63,8 +64,8 @@ class AccessorySeeder extends Seeder
                         'title' => $acc['title'],
                         'description' => $acc['description'] ?? null,
                         'price' => $acc['price'] ?? 0,
-                        'promo_quantity' => $acc['promoQuantity'] ?? null,
-                        'promo_price' => $acc['promoPrice'] ?? null,
+                        // Drop promotions that would cost more than the regular price.
+                        ...PromoPricing::sanitize($acc['price'] ?? 0, $acc['promoQuantity'] ?? null, $acc['promoPrice'] ?? null),
                         'stock' => $existing ? $existing->stock : $variedStock,
                         'category_id' => $catId,
                         'cover_url' => $acc['coverUrl'] ?? null,
