@@ -58,7 +58,8 @@ class AccessorySeeder extends Seeder
 
                 $existing = Accessory::withTrashed()->find($acc['id']);
 
-                Accessory::updateOrCreate(
+                // withTrashed so soft-deleted accessories are updated instead of re-inserted (PK clash).
+                Accessory::withTrashed()->updateOrCreate(
                     ['id' => $acc['id']],
                     [
                         'title' => $acc['title'],

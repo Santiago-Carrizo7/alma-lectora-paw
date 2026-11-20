@@ -25,7 +25,8 @@ class ComboSeeder extends Seeder
             $comboAccessories = $tables['comboAccessories'] ?? [];
 
             foreach ($combos as $c) {
-                Combo::updateOrCreate(
+                // withTrashed so soft-deleted combos are updated instead of re-inserted (PK clash).
+                Combo::withTrashed()->updateOrCreate(
                     ['id' => $c['id']],
                     [
                         'title' => $c['title'],
