@@ -20,6 +20,13 @@ class QaDefenseFixesTest extends TestCase
         app()->setLocale('es');
     }
 
+    private function seededSuperAdmin(): User
+    {
+        $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
+
+        return User::where('email', 'superadmin@almalectora.com')->firstOrFail();
+    }
+
     private function registrationPayload(array $overrides = []): array
     {
         return array_merge([
@@ -153,6 +160,61 @@ class QaDefenseFixesTest extends TestCase
         $this->assertSame(0, $overpriced);
         $this->assertSame(0, $halfPromos);
         $this->assertGreaterThan(0, Book::whereNotNull('promo_quantity')->count());
+    }
+
+    public function test_duplicate_accessory_category_returns_validation_error_instead_of_500(): void
+    {
+        $admin = User::factory()->admin()->create();
+        AccessoryCategory::create(['slug' => 'VELAS_AROMATICAS', 'label' => 'Velas Aromáticas', 'order' => 1, 'is_active' => true]);
+
+        foreach (['Velas Aromáticas', 'velas aromaticas', '  VELAS  AROMÁTICAS '] as $label) {
+            $response = $this->actingAs($admin)
+                ->from('/admin/configuracion')
+                ->post('/admin/configuracion/categorias', ['label' => $label]);
+
+            $response->assertRedirect('/admin/configuracion');
+            $response->assertSessionHasErrors(['label' => 'Ya existe una categoría con ese nombre.']);
+        }
+
+        $this->assertSame(1, AccessoryCategory::count());
+    }
+
+    public function test_new_accessory_category_is_still_created(): void
+    {
+        $admin = User::factory()->admin()->create();
+
+        $this->actingAs($admin)
+            ->post('/admin/configuracion/categorias', ['label' => 'Señaladores'])
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('accessory_categories', ['slug' => 'SENALADORES', 'label' => 'Señaladores']);
+    }
+
+    public function test_role_names_are_normalized_before_checking_uniqueness(): void
+    {
+        $superAdmin = $this->seededSuperAdmin();
+
+        $this->actingAs($superAdmin)
+            ->post('/admin/roles', ['name' => '  QA   Reportes '])
+            ->assertRedirect(route('admin.roles.index'));
+        $this->assertDatabaseHas('roles', ['name' => 'qa reportes']);
+
+        $duplicate = $this->actingAs($superAdmin)->post('/admin/roles', ['name' => 'QA REPORTES']);
+
+        $duplicate->assertSessionHasErrors(['name' => 'Ya existe un rol con ese nombre.']);
+        $this->assertSame(1, \Spatie\Permission\Models\Role::where('name', 'qa reportes')->count());
+    }
+
+    public function test_role_update_to_an_existing_name_with_different_case_is_rejected(): void
+    {
+        $superAdmin = $this->seededSuperAdmin();
+        \Spatie\Permission\Models\Role::create(['name' => 'qa reportes', 'guard_name' => 'web']);
+        $other = \Spatie\Permission\Models\Role::create(['name' => 'qa ventas', 'guard_name' => 'web']);
+
+        $response = $this->actingAs($superAdmin)->put("/admin/roles/{$other->id}", ['name' => 'QA Reportes']);
+
+        $response->assertSessionHasErrors(['name' => 'Ya existe un rol con ese nombre.']);
+        $this->assertSame('qa ventas', $other->fresh()->name);
     }
 
     public function test_combo_promo_update_not_cheaper_than_regular_price_is_rejected(): void

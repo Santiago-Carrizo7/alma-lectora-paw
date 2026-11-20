@@ -36,6 +36,7 @@ export function Index({ config, categories, genres }: IndexProps) {
     const [newCatLabel, setNewCatLabel] = useState('');
     const [newCatEmoji, setNewCatEmoji] = useState('');
     const [isCreatingCat, setIsCreatingCat] = useState(false);
+    const [catError, setCatError] = useState<string | null>(null);
 
     // Genre edit & delete modal states
     const [newGenreInput, setNewGenreInput] = useState('');
@@ -56,6 +57,7 @@ export function Index({ config, categories, genres }: IndexProps) {
         e.preventDefault();
         if (!newCatLabel.trim()) return;
 
+        setCatError(null);
         setIsCreatingCat(true);
         router.post(
             '/admin/configuracion/categorias',
@@ -68,9 +70,12 @@ export function Index({ config, categories, genres }: IndexProps) {
                 onSuccess: () => {
                     setNewCatLabel('');
                     setNewCatEmoji('');
-                    setIsCreatingCat(false);
                 },
-                onError: () => setIsCreatingCat(false),
+                onError: (errors) => {
+                    setCatError(errors.label || errors.emoji || Object.values(errors)[0] || 'No se pudo agregar la categoría.');
+                },
+                // Always leave the "Agregando..." state, even after an unexpected server error.
+                onFinish: () => setIsCreatingCat(false),
             },
         );
     };
@@ -302,6 +307,7 @@ export function Index({ config, categories, genres }: IndexProps) {
                                 {isCreatingCat ? 'Agregando...' : '+ Agregar Categoría'}
                             </button>
                         </form>
+                        {catError && <p className="text-xs font-medium text-red-600">{catError}</p>}
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 pt-1">
                             {categories.map((cat) => (

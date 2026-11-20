@@ -88,6 +88,26 @@ class AdminConfigController extends Controller
         ]);
 
         $slug = strtoupper(Str::slug($validated['label'], '_'));
+
+        if ($slug === '') {
+            throw ValidationException::withMessages([
+                'label' => 'Indicá un nombre de categoría válido (con letras o números).',
+            ]);
+        }
+
+        // The slug ignores case, accents and spacing, so it identifies duplicates
+        // before the unique index on `slug` turns them into a 500 error.
+        $alreadyExists = AccessoryCategory::query()
+            ->get(['slug', 'label'])
+            ->contains(fn (AccessoryCategory $category) => strtoupper((string) $category->slug) === $slug
+                || strtoupper(Str::slug((string) $category->label, '_')) === $slug);
+
+        if ($alreadyExists) {
+            throw ValidationException::withMessages([
+                'label' => 'Ya existe una categoría con ese nombre.',
+            ]);
+        }
+
         $maxOrder = AccessoryCategory::max('order') ?? 0;
 
         AccessoryCategory::create([

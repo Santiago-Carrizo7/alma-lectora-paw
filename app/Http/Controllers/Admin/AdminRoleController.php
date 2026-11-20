@@ -29,14 +29,16 @@ class AdminRoleController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $this->normalizeRoleName($request);
+
         $validated = $request->validate([
             'name' => 'required|string|max:255|unique:roles,name',
             'permissions' => 'nullable|array',
             'permissions.*' => 'string|exists:permissions,name',
-        ]);
+        ], $this->roleNameMessages());
 
         $role = Role::create([
-            'name' => strtolower(trim($validated['name'])),
+            'name' => $validated['name'],
             'guard_name' => 'web',
         ]);
 
@@ -65,6 +67,8 @@ class AdminRoleController extends Controller
 
     public function update(Request $request, Role $role): RedirectResponse
     {
+        $this->normalizeRoleName($request);
+
         // REGLA CRÍTICA: Proteger el nombre de roles del sistema
         if ($role->name === 'super-admin' && $request->input('name') !== 'super-admin') {
             return redirect()->back()->withErrors([
@@ -76,9 +80,9 @@ class AdminRoleController extends Controller
             'name' => 'required|string|max:255|unique:roles,name,' . $role->id,
             'permissions' => 'nullable|array',
             'permissions.*' => 'string|exists:permissions,name',
-        ]);
+        ], $this->roleNameMessages());
 
-        $role->update(['name' => strtolower(trim($validated['name']))]);
+        $role->update(['name' => $validated['name']]);
 
         // Si es super-admin, siempre conserva todos los permisos
         if ($role->name === 'super-admin') {
@@ -101,5 +105,28 @@ class AdminRoleController extends Controller
         $role->delete();
 
         return redirect()->route('admin.roles.index')->with('success', "Rol '{$role->name}' eliminado correctamente.");
+    }
+
+    /**
+     * Role names are stored lowercase (e.g. `super-admin`), so normalize the input
+     * (trim, collapse whitespace, lowercase) before the uniqueness check runs.
+     */
+    private function normalizeRoleName(Request $request): void
+    {
+        $name = $request->input('name');
+
+        if (is_string($name)) {
+            $request->merge(['name' => mb_strtolower(preg_replace('/\s+/u', ' ', trim($name)))]);
+        }
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function roleNameMessages(): array
+    {
+        return [
+            'name.unique' => 'Ya existe un rol con ese nombre.',
+        ];
     }
 }
