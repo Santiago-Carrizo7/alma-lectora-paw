@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\AccentInsensitiveSearch;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -90,13 +91,12 @@ class Accessory extends Model
 
     public function scopeFilter(Builder $query, array $filters): Builder
     {
-        $like = $query->getConnection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
-
         return $query
-            ->when($filters['search'] ?? null, function (Builder $q, string $search) use ($like) {
-                $q->where(function (Builder $sub) use ($search, $like) {
-                    $sub->where('title', $like, "%{$search}%")
-                        ->orWhere('description', $like, "%{$search}%");
+            ->when($filters['search'] ?? null, function (Builder $q, string $search) {
+                $term = trim($search);
+                $q->where(function (Builder $sub) use ($term) {
+                    AccentInsensitiveSearch::where($sub, 'title', $term);
+                    AccentInsensitiveSearch::orWhere($sub, 'description', $term);
                 });
             })
             ->when($filters['category'] ?? null, function (Builder $q, string $category) {

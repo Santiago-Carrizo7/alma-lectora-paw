@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\AccentInsensitiveSearch;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -67,14 +68,14 @@ class Book extends Model
     {
         $like = $query->getConnection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
 
-        $query->when($filters['search'] ?? null, function (Builder $q, string $search) use ($like) {
+        $query->when($filters['search'] ?? null, function (Builder $q, string $search) {
             $term = trim($search);
-            $q->where(function (Builder $sub) use ($term, $like) {
-                $sub->where('title', $like, "%{$term}%")
-                    ->orWhere('original_title', $like, "%{$term}%")
-                    ->orWhere('isbn', 'like', "%{$term}%")
-                    ->orWhereHas('authors', function (Builder $authorQ) use ($term, $like) {
-                        $authorQ->where('name', $like, "%{$term}%");
+            $q->where(function (Builder $sub) use ($term) {
+                AccentInsensitiveSearch::where($sub, 'title', $term);
+                AccentInsensitiveSearch::orWhere($sub, 'original_title', $term);
+                $sub->orWhere('isbn', 'like', AccentInsensitiveSearch::containsPattern($sub, $term))
+                    ->orWhereHas('authors', function (Builder $authorQ) use ($term) {
+                        AccentInsensitiveSearch::where($authorQ, 'name', $term);
                     });
             });
         });

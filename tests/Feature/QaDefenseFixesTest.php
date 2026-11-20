@@ -217,6 +217,46 @@ class QaDefenseFixesTest extends TestCase
         $this->assertSame('qa ventas', $other->fresh()->name);
     }
 
+    public function test_book_search_ignores_accents_and_case(): void
+    {
+        $book = Book::create(['isbn' => '9789870099010', 'title' => 'Historias de Diván', 'price' => 18000, 'stock' => 5, 'is_active' => true]);
+        $book->authors()->attach(\App\Models\Author::create(['name' => 'Gabriel Rolón'])->id);
+        Book::create(['isbn' => '9789870099011', 'title' => 'Otro Libro', 'price' => 10000, 'stock' => 5, 'is_active' => true]);
+
+        foreach (['Rolon', 'rolón', 'ROLON', 'divan', 'DIVÁN', 'Rolón'] as $term) {
+            $titles = Book::filter(['search' => $term])->pluck('title')->all();
+            $this->assertSame(['Historias de Diván'], $titles, "Search term: {$term}");
+        }
+
+        $this->assertSame(['Historias de Diván'], Book::filter(['search' => '9789870099010'])->pluck('title')->all());
+    }
+
+    public function test_search_escapes_like_wildcards(): void
+    {
+        Book::create(['isbn' => '9789870099012', 'title' => 'Cien por ciento', 'price' => 10000, 'stock' => 5, 'is_active' => true]);
+
+        $this->assertSame([], Book::filter(['search' => '%'])->pluck('title')->all());
+        $this->assertSame([], Book::filter(['search' => 'Cien_por'])->pluck('title')->all());
+    }
+
+    public function test_accessory_and_combo_search_ignore_accents(): void
+    {
+        $category = AccessoryCategory::create(['slug' => 'VELAS', 'label' => 'Velas', 'order' => 1, 'is_active' => true]);
+        $accessory = \App\Models\Accessory::create(['title' => 'Vela Aromática', 'price' => 5000, 'stock' => 5, 'category_id' => $category->id, 'is_active' => true]);
+        $book = Book::create(['isbn' => '9789870099013', 'title' => 'El Duelo', 'price' => 18000, 'stock' => 5, 'is_active' => true]);
+        $book->authors()->attach(\App\Models\Author::create(['name' => 'Gabriel Rolón'])->id);
+
+        $combo = Combo::create(['title' => 'Combo Otoño', 'price' => 20000, 'stock' => 3, 'is_active' => true]);
+        $combo->books()->create(['book_id' => $book->id, 'quantity' => 1]);
+        $comboWithAccessory = Combo::create(['title' => 'Combo Noche', 'price' => 9000, 'stock' => 3, 'is_active' => true]);
+        $comboWithAccessory->accessories()->create(['accessory_id' => $accessory->id, 'quantity' => 1]);
+
+        $this->assertSame(['Vela Aromática'], \App\Models\Accessory::filter(['search' => 'aromatica'])->pluck('title')->all());
+        $this->assertSame(['Combo Otoño'], Combo::filter(['search' => 'otono'])->pluck('title')->all());
+        $this->assertSame(['Combo Otoño'], Combo::filter(['search' => 'Rolon'])->pluck('title')->all());
+        $this->assertSame(['Combo Noche'], Combo::filter(['search' => 'AROMATICA'])->pluck('title')->all());
+    }
+
     public function test_combo_promo_update_not_cheaper_than_regular_price_is_rejected(): void
     {
         $admin = User::factory()->admin()->create();

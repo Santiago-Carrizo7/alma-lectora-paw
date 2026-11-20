@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\AccentInsensitiveSearch;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -53,21 +54,19 @@ class Combo extends Model
 
     public function scopeFilter(Builder $query, array $filters): Builder
     {
-        $like = $query->getConnection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
-
-        $query->when($filters['search'] ?? null, function (Builder $q, string $search) use ($like) {
+        $query->when($filters['search'] ?? null, function (Builder $q, string $search) {
             $term = trim($search);
-            $q->where(function (Builder $sub) use ($term, $like) {
-                $sub->where('title', $like, "%{$term}%")
-                    ->orWhere('description', $like, "%{$term}%")
-                    ->orWhereHas('books.book', function (Builder $bookQ) use ($term, $like) {
-                        $bookQ->where('title', $like, "%{$term}%")
-                            ->orWhereHas('authors', function (Builder $authorQ) use ($term, $like) {
-                                $authorQ->where('name', $like, "%{$term}%");
-                            });
-                    })
-                    ->orWhereHas('accessories.accessory', function (Builder $accQ) use ($term, $like) {
-                        $accQ->where('title', $like, "%{$term}%");
+            $q->where(function (Builder $sub) use ($term) {
+                AccentInsensitiveSearch::where($sub, 'title', $term);
+                AccentInsensitiveSearch::orWhere($sub, 'description', $term);
+                $sub->orWhereHas('books.book', function (Builder $bookQ) use ($term) {
+                    AccentInsensitiveSearch::where($bookQ, 'title', $term);
+                    $bookQ->orWhereHas('authors', function (Builder $authorQ) use ($term) {
+                        AccentInsensitiveSearch::where($authorQ, 'name', $term);
+                    });
+                })
+                    ->orWhereHas('accessories.accessory', function (Builder $accQ) use ($term) {
+                        AccentInsensitiveSearch::where($accQ, 'title', $term);
                     });
             });
         });
