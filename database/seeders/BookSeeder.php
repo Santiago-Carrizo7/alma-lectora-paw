@@ -53,7 +53,8 @@ class BookSeeder extends Seeder
 
                 $existing = Book::withTrashed()->find($item['id']);
 
-                Book::updateOrCreate(
+                // withTrashed so soft-deleted books are updated instead of re-inserted (PK clash).
+                Book::withTrashed()->updateOrCreate(
                     ['id' => $item['id']],
                     [
                         'isbn' => $item['isbn'],
