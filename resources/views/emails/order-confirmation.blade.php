@@ -63,7 +63,7 @@
                     <td style="padding: 10px 14px; font-size: 13px; color: #1c1917;">
                         <strong>{{ $item['title'] ?? 'Producto' }}</strong>
                         @if(!empty($item['type']))
-                            <div style="font-size: 10px; color: #78716c; text-transform: uppercase; margin-top: 2px;">{{ $item['type'] }}</div>
+                            <div style="font-size: 10px; color: #78716c; text-transform: uppercase; margin-top: 2px;">{{ \App\Support\ProductTypeLabel::label($item['type']) }}</div>
                         @endif
                     </td>
                     <td style="padding: 10px 14px; text-align: center; font-size: 13px; color: #1c1917; font-weight: 600;">
