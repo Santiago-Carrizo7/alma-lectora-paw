@@ -11,6 +11,7 @@ use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithColumnFormatting;
 use Maatwebsite\Excel\Concerns\WithCustomStartCell;
 use Maatwebsite\Excel\Concerns\WithCustomValueBinder;
+use Maatwebsite\Excel\Concerns\WithStrictNullComparison;
 use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
@@ -32,7 +33,8 @@ class BooksExport extends DefaultValueBinder implements
     WithColumnFormatting,
     WithEvents,
     WithTitle,
-    WithCustomValueBinder
+    WithCustomValueBinder,
+    WithStrictNullComparison
 {
     use Exportable;
     use FormulaSafeValueBinder;

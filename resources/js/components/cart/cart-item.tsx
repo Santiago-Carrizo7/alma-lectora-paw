@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getItemSubtotal, useCart, type CartItem as CartItemType } from '../../lib/cart-store';
 import { formatPrice } from '../../lib/price';
+import { productTypeLabel } from '../../lib/product-type';
 import { SafeImage } from '../ui/safe-image';
 
 interface CartItemProps {
@@ -22,18 +23,7 @@ export function CartItem({ item }: CartItemProps) {
     const itemTotal = formatPrice(getItemSubtotal(item));
     const persistentWarning = stockWarnings[item.id];
 
-    const getPlaceholderLabel = () => {
-        switch (item.type) {
-            case 'BOOK':
-                return 'Libro';
-            case 'ACCESSORY':
-                return 'Accesorio';
-            case 'COMBO':
-                return 'Combo';
-            default:
-                return 'Producto';
-        }
-    };
+    const getPlaceholderLabel = () => productTypeLabel(item.type);
 
     const formatStockLimitWarning = (available: number) => {
         if (available <= 0) {

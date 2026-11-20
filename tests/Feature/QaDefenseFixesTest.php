@@ -344,6 +344,74 @@ class QaDefenseFixesTest extends TestCase
         ]);
     }
 
+    /**
+     * Export to a real XLSX and return the row (column letter => value) that contains $needle.
+     *
+     * @return array<string, mixed>
+     */
+    private function exportedRowContaining(object $export, string $needle): array
+    {
+        $path = tempnam(sys_get_temp_dir(), 'xlsx');
+        file_put_contents($path, \Maatwebsite\Excel\Facades\Excel::raw($export, \Maatwebsite\Excel\Excel::XLSX));
+
+        try {
+            $sheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($path)->getActiveSheet();
+            foreach ($sheet->getRowIterator() as $row) {
+                $values = [];
+                foreach ($row->getCellIterator() as $cell) {
+                    $values[$cell->getColumn()] = $cell->getValue();
+                }
+                if (in_array($needle, $values, true)) {
+                    return $values;
+                }
+            }
+        } finally {
+            @unlink($path);
+        }
+
+        $this->fail("Row containing '{$needle}' not found in export.");
+    }
+
+    public function test_excel_exports_render_zero_values_as_zero_not_blank(): void
+    {
+        $critical = $this->exportedRowContaining(new \App\Exports\Sheets\CriticalStockSheet([
+            ['isbn' => '9789870099030', 'title' => 'Libro Agotado', 'authors' => 'Autora', 'price' => 12000, 'stock' => 0],
+        ]), 'Libro Agotado');
+        $this->assertSame(0, $critical['F']);
+
+        $performance = $this->exportedRowContaining(new \App\Exports\Sheets\BooksPerformanceSheet([], [], [
+            ['id' => 'x', 'isbn' => '9789870099031', 'title' => 'Libro Sin Ventas', 'authors' => 'Autor', 'genre' => 'Novela', 'price' => 0, 'units_sold' => 0, 'total_revenue' => 0, 'stock' => 0],
+        ]), 'Libro Sin Ventas');
+        $this->assertContains(0, array_values($performance), 'Zero units/stock should be written as 0.');
+        $this->assertNotContains(null, array_slice(array_values($performance), 0, 9));
+
+        Book::create(['isbn' => '9789870099032', 'title' => 'Libro Stock Cero', 'price' => 10000, 'stock' => 0, 'is_active' => true]);
+        $catalog = $this->exportedRowContaining(new \App\Exports\BooksExport([]), 'Libro Stock Cero');
+        $this->assertSame(0, $catalog['F']);
+    }
+
+    public function test_remito_shows_product_type_in_spanish(): void
+    {
+        $order = \App\Models\OrderLead::create([
+            'customer_name' => 'Juan Perez',
+            'customer_phone' => '5493875112233',
+            'customer_email' => 'juan.perez@example.com',
+            'customer_dni' => '35123456',
+            'items' => [
+                ['id' => 'b1', 'type' => 'BOOK', 'title' => 'Libro Remito', 'quantity' => 1, 'unit_price' => 1000, 'subtotal' => 1000],
+                ['id' => 'a1', 'type' => 'ACCESSORY', 'title' => 'Vela Remito', 'quantity' => 1, 'unit_price' => 500, 'subtotal' => 500],
+            ],
+            'total_amount' => 1500,
+            'status' => 'PENDING_WHATSAPP',
+        ]);
+
+        $html = view('pdf.order-remito', ['order' => $order])->render();
+
+        $this->assertStringContainsString('Libro', $html);
+        $this->assertStringContainsString('Accesorio', $html);
+        $this->assertDoesNotMatchRegularExpression('/>\s*(BOOK|ACCESSORY)\s*</', $html);
+    }
+
     public function test_combo_promo_update_not_cheaper_than_regular_price_is_rejected(): void
     {
         $admin = User::factory()->admin()->create();

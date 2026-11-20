@@ -307,7 +307,7 @@
     </table>
 
     <!-- Critical Stock -->
-    <div class="section-header" style="background-color: #991b1b;">3. Alertas de Stock (&le; 3 unidades)</div>
+    <div class="section-header" style="background-color: #991b1b;">3. Alertas de Stock (3 unidades o menos)</div>
     <table class="data-table">
         <thead>
             <tr>

@@ -241,7 +241,7 @@
                         <span class="check-box"></span>
                     </td>
                     <td style="font-size: 10px; color: #57534e; text-transform: uppercase;">
-                        {{ $item['type'] ?? 'PRODUCTO' }}
+                        {{ \App\Support\ProductTypeLabel::label($item['type'] ?? null) }}
                     </td>
                     <td>
                         <strong>{{ $item['title'] ?? 'Sin título' }}</strong>

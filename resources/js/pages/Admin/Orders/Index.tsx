@@ -4,6 +4,7 @@ import { BookThumbnail } from '../../../components/ui/book-thumbnail';
 import { PaginationLinks } from '../../../components/ui/pagination-links';
 import { AdminLayout } from '../../../layouts/admin-layout';
 import { formatPrice } from '../../../lib/price';
+import { productTypeLabel } from '../../../lib/product-type';
 import type { PaginatedData } from '../../../types/alma';
 
 interface OrderItem {
@@ -407,7 +408,7 @@ export function Index({ orders, filters, counts }: IndexProps) {
                                                                     {item.title}
                                                                 </div>
                                                                 <div className="text-ink-muted text-[10px] mt-0.5">
-                                                                    {item.type && `Tipo: ${item.type} | `} Cantidad: {item.quantity}
+                                                                    {item.type && `Tipo: ${productTypeLabel(item.type)} | `} Cantidad: {item.quantity}
                                                                 </div>
                                                             </div>
                                                         </div>
