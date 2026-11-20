@@ -130,10 +130,14 @@ class OrderLeadController extends Controller
             'status' => 'PENDING_WHATSAPP',
         ]);
 
+        // Lets the checkout screen tell the truth when SMTP is unavailable.
+        $emailSent = false;
+
         if (!empty($orderLead->customer_email)) {
             try {
                 \Illuminate\Support\Facades\Mail::to($orderLead->customer_email)
                     ->send(new \App\Mail\OrderConfirmationMail($orderLead));
+                $emailSent = true;
             } catch (\Throwable $e) {
                 \Illuminate\Support\Facades\Log::warning("No se pudo enviar email de confirmación para orden {$orderLead->id}: " . $e->getMessage());
             }
@@ -143,6 +147,7 @@ class OrderLeadController extends Controller
             'success' => true,
             'orderId' => $orderLead->id,
             'totalAmount' => (float) $orderLead->total_amount,
+            'emailSent' => $emailSent,
         ], 201);
     }
 }

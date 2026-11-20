@@ -257,6 +257,93 @@ class QaDefenseFixesTest extends TestCase
         $this->assertSame(['Combo Noche'], Combo::filter(['search' => 'AROMATICA'])->pluck('title')->all());
     }
 
+    private function checkoutPayload(array $overrides = []): array
+    {
+        \App\Models\StoreConfig::create(['whatsapp_phone' => '5493875708557', 'is_store_open' => true]);
+        $book = Book::create(['isbn' => '9789870099020', 'title' => 'Libro Checkout', 'price' => 15000, 'stock' => 10, 'is_active' => true]);
+
+        return array_merge([
+            'customer_name' => 'Juan Perez',
+            'customer_phone' => '5493875112233',
+            'customer_email' => 'juan.perez@example.com',
+            'customer_dni' => '35123456',
+            'postal_code' => '4400',
+            'address' => 'Av. San Martín 123',
+            'items' => [
+                ['id' => $book->id, 'type' => 'BOOK', 'title' => 'Libro Checkout', 'quantity' => 1, 'unit_price' => 15000],
+            ],
+            'total_amount' => 15000,
+        ], $overrides);
+    }
+
+    public function test_checkout_rejects_dni_and_phone_with_letters(): void
+    {
+        $response = $this->postJson('/pedidos/lead', $this->checkoutPayload([
+            'customer_dni' => '35ABC456',
+            'customer_phone' => '387-CALL-ME',
+        ]));
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors([
+            'customer_dni' => 'El DNI o CUIT debe contener solo números (7 a 11 dígitos).',
+            'customer_phone' => 'El teléfono debe contener solo números (8 a 15 dígitos).',
+        ]);
+        $this->assertSame(0, \App\Models\OrderLead::count());
+    }
+
+    public function test_checkout_stores_formatted_dni_and_phone_as_digits(): void
+    {
+        $response = $this->postJson('/pedidos/lead', $this->checkoutPayload([
+            'customer_dni' => '35.123.456',
+            'customer_phone' => '+54 9 387 512-3456',
+        ]));
+
+        $response->assertStatus(201);
+        $this->assertDatabaseHas('order_leads', [
+            'id' => $response->json('orderId'),
+            'customer_dni' => '35123456',
+            'customer_phone' => '5493875123456',
+        ]);
+    }
+
+    public function test_checkout_response_reports_whether_the_email_was_sent(): void
+    {
+        $response = $this->postJson('/pedidos/lead', $this->checkoutPayload());
+
+        $response->assertStatus(201);
+        $response->assertJson(['success' => true, 'emailSent' => true]);
+    }
+
+    public function test_checkout_response_reports_email_failure_without_losing_the_order(): void
+    {
+        \Illuminate\Support\Facades\Mail::shouldReceive('to')->andThrow(new \RuntimeException('SMTP down'));
+
+        $response = $this->postJson('/pedidos/lead', $this->checkoutPayload());
+
+        $response->assertStatus(201);
+        $response->assertJson(['success' => true, 'emailSent' => false]);
+        $this->assertSame(1, \App\Models\OrderLead::count());
+    }
+
+    public function test_registration_rejects_letters_and_normalizes_dni_and_phone(): void
+    {
+        $this->post('/register', $this->registrationPayload(['dni' => 'ABC12345', 'phone' => 'no tengo']))
+            ->assertSessionHasErrors([
+                'dni' => 'El DNI o CUIT debe contener solo números (7 a 11 dígitos).',
+                'phone' => 'El teléfono debe contener solo números (8 a 15 dígitos).',
+            ]);
+        $this->assertGuest();
+
+        $this->post('/register', $this->registrationPayload(['dni' => '20-35123456-7', 'phone' => '+54 9 387 512-3456']))
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('users', [
+            'email' => 'lectora@example.com',
+            'dni' => '20351234567',
+            'phone' => '5493875123456',
+        ]);
+    }
+
     public function test_combo_promo_update_not_cheaper_than_regular_price_is_rejected(): void
     {
         $admin = User::factory()->admin()->create();

@@ -7,6 +7,7 @@ import { StepSummary } from '../../components/checkout/step-summary';
 import { ButtonEditorial } from '../../components/ui/button-editorial';
 import { PageShell } from '../../layouts/page-shell';
 import { useCart } from '../../lib/cart-store';
+import { onlyDigits } from '../../lib/digits';
 import { buildWhatsAppUrl } from '../../lib/whatsapp';
 import type { CustomerFormData, ShippingFormData } from '../../types/alma';
 import type { SharedData } from '../../types/index';
@@ -35,8 +36,8 @@ export default function CheckoutIndex() {
             return {
                 customerName: user.name || '',
                 customerEmail: user.email || '',
-                customerDni: (user.dni as string) || '',
-                customerPhone: (user.phone as string) || '',
+                customerDni: onlyDigits(user.dni as string | null),
+                customerPhone: onlyDigits(user.phone as string | null),
             };
         }
         return null;
@@ -47,6 +48,7 @@ export default function CheckoutIndex() {
     const [completedOrder, setCompletedOrder] = useState<{
         orderId: string;
         whatsappUrl: string;
+        emailSent: boolean;
     } | null>(null);
 
     // If cart is empty on initial load, redirect to catalog after small delay
@@ -165,6 +167,7 @@ export default function CheckoutIndex() {
             setCompletedOrder({
                 orderId: data.orderId,
                 whatsappUrl,
+                emailSent: data.emailSent === true,
             });
             setIsSubmitting(false);
 
@@ -205,7 +208,9 @@ export default function CheckoutIndex() {
                         </h1>
 
                         <p className="mt-2 text-xs sm:text-sm text-ink-muted leading-relaxed max-w-md mx-auto">
-                            Hemos guardado tu solicitud en el sistema y te enviamos el comprobante por correo electrónico. Abrimos WhatsApp en una pestaña nueva para coordinar el pago y la entrega.
+                            {completedOrder.emailSent
+                                ? 'Hemos guardado tu solicitud en el sistema y te enviamos el comprobante por correo electrónico. Abrimos WhatsApp en una pestaña nueva para coordinar el pago y la entrega.'
+                                : 'Hemos guardado tu solicitud en el sistema, pero en este momento no pudimos enviarte el comprobante por correo electrónico. Continuá la coordinación del pago y la entrega por WhatsApp, que abrimos en una pestaña nueva.'}
                         </p>
 
                         <div className="my-6 rounded-2xl bg-paper p-4 border border-stone-200/80 text-left">

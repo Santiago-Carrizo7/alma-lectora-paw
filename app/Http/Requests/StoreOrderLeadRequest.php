@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Support\ContactNormalizer;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreOrderLeadRequest extends FormRequest
@@ -15,6 +16,17 @@ class StoreOrderLeadRequest extends FormRequest
     }
 
     /**
+     * Normalize formatted DNI/CUIT and phone numbers to plain digits before validating.
+     */
+    protected function prepareForValidation(): void
+    {
+        $this->merge([
+            'customer_dni' => ContactNormalizer::digits($this->input('customer_dni')),
+            'customer_phone' => ContactNormalizer::digits($this->input('customer_phone')),
+        ]);
+    }
+
+    /**
      * Get the validation rules that apply to the request.
      *
      * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
@@ -23,9 +35,9 @@ class StoreOrderLeadRequest extends FormRequest
     {
         return [
             'customer_name' => ['required', 'string', 'min:2', 'max:150'],
-            'customer_phone' => ['required', 'string', 'min:6', 'max:50'],
+            'customer_phone' => ['required', 'string', 'digits_between:8,15'],
             'customer_email' => ['required', 'email', 'max:255'],
-            'customer_dni' => ['required', 'string', 'min:5', 'max:20'],
+            'customer_dni' => ['required', 'string', 'digits_between:7,11'],
             'postal_code' => ['nullable', 'string', 'max:20'],
             'address' => ['nullable', 'string', 'max:255'],
             'items' => ['required', 'array', 'min:1', 'max:30'],
@@ -52,6 +64,7 @@ class StoreOrderLeadRequest extends FormRequest
             'items.required' => 'El carrito no puede estar vacío.',
             'items.min' => 'Debes incluir al menos un producto en el pedido.',
             'items.max' => 'No podés incluir más de 30 ítems distintos en un mismo pedido.',
+            ...ContactNormalizer::messages('customer_dni', 'customer_phone'),
         ];
     }
 }

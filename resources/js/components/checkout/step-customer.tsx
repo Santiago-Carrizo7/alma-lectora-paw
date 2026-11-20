@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { DNI_DIGITS, DNI_DIGITS_MESSAGE, onlyDigits, PHONE_DIGITS, PHONE_DIGITS_MESSAGE } from '../../lib/digits';
 import type { CustomerFormData } from '../../types/alma';
 import { ButtonEditorial } from '../ui/button-editorial';
 
@@ -12,8 +13,9 @@ interface StepCustomerProps {
 export function StepCustomer({ initialData, serverErrors, onNext, onBack }: StepCustomerProps) {
     const [customerName, setCustomerName] = useState(initialData?.customerName ?? '');
     const [customerEmail, setCustomerEmail] = useState(initialData?.customerEmail ?? '');
-    const [customerDni, setCustomerDni] = useState(initialData?.customerDni ?? '');
-    const [customerPhone, setCustomerPhone] = useState(initialData?.customerPhone ?? '');
+    // Profile values may be formatted (e.g. "+54 9 387 512-3456"); keep digits only.
+    const [customerDni, setCustomerDni] = useState(onlyDigits(initialData?.customerDni));
+    const [customerPhone, setCustomerPhone] = useState(onlyDigits(initialData?.customerPhone));
     const [error, setError] = useState('');
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -28,13 +30,13 @@ export function StepCustomer({ initialData, serverErrors, onNext, onBack }: Step
             return;
         }
 
-        if (customerDni.trim().length < 5) {
-            setError('El DNI o CUIT debe tener al menos 5 caracteres.');
+        if (customerDni.length < DNI_DIGITS.min || customerDni.length > DNI_DIGITS.max) {
+            setError(DNI_DIGITS_MESSAGE);
             return;
         }
 
-        if (customerPhone.trim().length < 6) {
-            setError('El teléfono móvil debe tener al menos 6 caracteres.');
+        if (customerPhone.length < PHONE_DIGITS.min || customerPhone.length > PHONE_DIGITS.max) {
+            setError(PHONE_DIGITS_MESSAGE);
             return;
         }
 
@@ -101,9 +103,10 @@ export function StepCustomer({ initialData, serverErrors, onNext, onBack }: Step
                     </label>
                     <input
                         type="text"
+                        inputMode="numeric"
                         id="customerDni"
                         value={customerDni}
-                        onChange={(e) => setCustomerDni(e.target.value)}
+                        onChange={(e) => setCustomerDni(onlyDigits(e.target.value))}
                         placeholder="Ej: 35123456"
                         className="border-paper-dark bg-paper text-ink placeholder-stone-400 focus:ring-forest/25 focus:border-forest block w-full rounded-md border px-3.5 py-2.5 text-sm transition-colors focus:outline-none focus:ring-2"
                         required
@@ -123,9 +126,10 @@ export function StepCustomer({ initialData, serverErrors, onNext, onBack }: Step
                     </label>
                     <input
                         type="tel"
+                        inputMode="numeric"
                         id="customerPhone"
                         value={customerPhone}
-                        onChange={(e) => setCustomerPhone(e.target.value)}
+                        onChange={(e) => setCustomerPhone(onlyDigits(e.target.value))}
                         placeholder="Ej: 5493875112233"
                         className="border-paper-dark bg-paper text-ink placeholder-stone-400 focus:ring-forest/25 focus:border-forest block w-full rounded-md border px-3.5 py-2.5 text-sm transition-colors focus:outline-none focus:ring-2"
                         required

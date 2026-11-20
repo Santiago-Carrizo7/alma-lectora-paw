@@ -2,6 +2,7 @@ import React, { FormEventHandler, useState } from 'react';
 import { Head, Link, useForm } from '@inertiajs/react';
 import PageShell from '@/layouts/page-shell';
 import { ButtonEditorial } from '@/components/ui/button-editorial';
+import { DNI_DIGITS, DNI_DIGITS_MESSAGE, onlyDigits, PHONE_DIGITS, PHONE_DIGITS_MESSAGE } from '@/lib/digits';
 
 interface AuthHubProps {
     initialTab?: 'login' | 'register';
@@ -71,6 +72,17 @@ export default function AuthHub({
 
     const submitRegister: FormEventHandler = (e) => {
         e.preventDefault();
+        registerForm.clearErrors('dni', 'phone');
+
+        const { dni, phone } = registerForm.data;
+        const dniInvalid = dni.length < DNI_DIGITS.min || dni.length > DNI_DIGITS.max;
+        const phoneInvalid = phone.length < PHONE_DIGITS.min || phone.length > PHONE_DIGITS.max;
+        if (dniInvalid || phoneInvalid) {
+            if (dniInvalid) registerForm.setError('dni', DNI_DIGITS_MESSAGE);
+            if (phoneInvalid) registerForm.setError('phone', PHONE_DIGITS_MESSAGE);
+            return;
+        }
+
         registerForm.post('/register', {
             onFinish: () => registerForm.reset('password', 'password_confirmation'),
         });
@@ -413,9 +425,10 @@ export default function AuthHub({
                                                     <input
                                                         id="reg_dni"
                                                         type="text"
+                                                        inputMode="numeric"
                                                         required
                                                         value={registerForm.data.dni}
-                                                        onChange={(e) => registerForm.setData('dni', e.target.value)}
+                                                        onChange={(e) => registerForm.setData('dni', onlyDigits(e.target.value))}
                                                         placeholder="ej: 38123456"
                                                         className="bg-paper border-stone-300 text-ink placeholder:text-stone-400 focus:ring-forest/40 focus:border-forest w-full rounded-xl border p-2 text-xs transition-all focus:ring-2 focus:outline-none"
                                                     />
@@ -432,10 +445,11 @@ export default function AuthHub({
                                                     <input
                                                         id="reg_phone"
                                                         type="tel"
+                                                        inputMode="numeric"
                                                         required
                                                         value={registerForm.data.phone}
-                                                        onChange={(e) => registerForm.setData('phone', e.target.value)}
-                                                        placeholder="ej: +54 9 387 123-4567"
+                                                        onChange={(e) => registerForm.setData('phone', onlyDigits(e.target.value))}
+                                                        placeholder="ej: 5493871234567"
                                                         className="bg-paper border-stone-300 text-ink placeholder:text-stone-400 focus:ring-forest/40 focus:border-forest w-full rounded-xl border p-2 text-xs transition-all focus:ring-2 focus:outline-none"
                                                     />
                                                     {registerForm.errors.phone && (

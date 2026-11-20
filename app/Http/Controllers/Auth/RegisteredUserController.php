@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Support\ContactNormalizer;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -32,15 +33,20 @@ class RegisteredUserController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
+        $request->merge([
+            'dni' => ContactNormalizer::digits($request->input('dni')),
+            'phone' => ContactNormalizer::digits($request->input('phone')),
+        ]);
+
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|lowercase|email|max:255|unique:'.User::class,
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
-            'dni' => 'required|string|max:30',
-            'phone' => 'required|string|max:50',
+            'dni' => 'required|string|digits_between:7,11',
+            'phone' => 'required|string|digits_between:8,15',
             'address' => 'required|string|max:500',
             'postal_code' => 'required|string|max:20',
-        ]);
+        ], ContactNormalizer::messages('dni', 'phone'));
 
         $user = User::create([
             'name' => $request->name,
